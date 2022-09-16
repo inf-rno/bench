@@ -1,0 +1,216 @@
+package main
+
+import (
+	"flag"
+	"fmt"
+	"math/rand"
+	"strings"
+	"time"
+
+	gomemcache "github.com/bradfitz/gomemcache/memcache"
+	redigo "github.com/gomodule/redigo/redis"
+	"github.com/loov/hrtime"
+)
+
+type config struct {
+	runs        int
+	iters       int
+	concurrency int
+	ratio       float64
+	data        int
+	server      string
+	port        int
+	protocol    string
+}
+
+func main() {
+	runs := flag.Int("x", 3, "number of full test iterations")
+	iters := flag.Int("n", 1000, "number of task iterations per goroutine")
+	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
+	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
+	data := flag.Int("d", 32, "size of the data payload in bytes")
+	server := flag.String("s", "127.0.0.1", "server address")
+	port := flag.Int("p", 6379, "server port")
+	protocol := flag.String("P", "redis", "protocol (redis/memcache)")
+
+	flag.Parse()
+
+	run(config{
+		runs:        *runs,
+		iters:       *iters,
+		concurrency: *concurrency,
+		ratio:       *ratio,
+		data:        *data,
+		server:      *server,
+		port:        *port,
+		protocol:    *protocol,
+	})
+}
+
+func run(c config) {
+	rand.Seed(time.Now().UnixNano())
+
+	res := []map[string]*hrtime.Histogram{}
+	for i := 0; i < c.runs; i++ {
+		fmt.Println("RUNNING: ", i+1)
+		var t task
+		if c.protocol == "redis" {
+			t = newRedis(c.server, c.port, c.data, c.ratio)
+		} else if c.protocol == "memcache" {
+			t = newMemcache(c.server, c.port, c.data, c.ratio)
+		} else {
+			panic(fmt.Errorf("unknown protocol: %s", c.protocol))
+		}
+		t.init()
+
+		bench := newBench(c.iters)
+		for j := 0; j < c.iters; j++ {
+			op, d, err := t.do()
+			if err != nil {
+				panic(fmt.Errorf("failed to do task: %w", err))
+			}
+			bench.appendTime(op, d)
+		}
+		res = append(res, bench.histogram())
+	}
+
+	fmt.Println("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~")
+
+opLoop:
+	for _, op := range []string{"SET", "GET"} {
+		fmt.Println("OP: ", op)
+		min, max := 0, 0
+		for i, r := range res {
+			h := r[op]
+			hmin := res[min][op]
+			hmax := res[max][op]
+			if h == nil || hmin == nil || hmax == nil {
+				continue opLoop
+			}
+			if h.P99 < hmin.P99 {
+				min = i
+			}
+			if h.P99 > hmax.P99 {
+				max = i
+			}
+		}
+
+		fmt.Println("BEST RUN: ", min+1, "\n", res[min][op].StringStats())
+		fmt.Println("WORST RUN: ", max+1, "\n", res[max][op].String())
+
+	}
+}
+
+type bench struct {
+	times map[string][]time.Duration
+}
+
+func newBench(c int) *bench {
+	return &bench{
+		times: map[string][]time.Duration{},
+	}
+}
+
+func (b *bench) appendTime(op string, d time.Duration) {
+	b.times[op] = append(b.times[op], d)
+}
+
+func (b *bench) histogram() map[string]*hrtime.Histogram {
+	opts := hrtime.HistogramOptions{
+		BinCount:        10,
+		NiceRange:       true,
+		ClampMaximum:    0,
+		ClampPercentile: 0.999,
+	}
+	res := map[string]*hrtime.Histogram{}
+	for op, times := range b.times {
+		res[op] = hrtime.NewDurationHistogram(times, &opts)
+	}
+	return res
+}
+
+type task interface {
+	init()
+	do() (string, time.Duration, error)
+}
+
+type redis struct {
+	conn  redigo.Conn
+	key   string
+	data  string
+	ratio float64
+}
+
+func newRedis(addr string, port int, data int, ratio float64) task {
+	c, err := redigo.DialURL(fmt.Sprintf("redis://%s:%d", addr, port))
+	if err != nil {
+		panic(fmt.Errorf("failed to connect to redis: %w", err))
+	}
+	return &redis{
+		conn:  c,
+		key:   "lol",
+		data:  strings.Repeat("x", data),
+		ratio: ratio,
+	}
+}
+
+func (r *redis) init() {
+	_, err := r.conn.Do("SET", r.key, r.data)
+	if err != nil {
+		panic(fmt.Errorf("failed to init set: %w", err))
+	}
+}
+
+func (r *redis) do() (op string, d time.Duration, err error) {
+	rand := rand.Float64()
+	args := []any{}
+	if rand <= r.ratio {
+		op = "SET"
+		args = append(args, r.key, r.data)
+
+	} else {
+		op = "GET"
+		args = append(args, r.key)
+	}
+	start := hrtime.Now()
+	_, err = r.conn.Do(op, args...)
+	d = hrtime.Now() - start
+	return
+}
+
+type memcache struct {
+	client *gomemcache.Client
+	key    string
+	data   []byte
+	ratio  float64
+}
+
+func newMemcache(addr string, port int, data int, ratio float64) task {
+	mc := gomemcache.New(fmt.Sprintf("%s:%d", addr, port))
+	return &memcache{
+		client: mc,
+		key:    "lol",
+		data:   []byte(strings.Repeat("x", data)),
+		ratio:  ratio,
+	}
+}
+
+func (m *memcache) init() {
+	m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
+}
+
+func (m *memcache) do() (op string, d time.Duration, err error) {
+	rand := rand.Float64()
+	if rand <= m.ratio {
+		op = "SET"
+		start := hrtime.Now()
+		m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
+		d = hrtime.Now() - start
+	} else {
+		op = "GET"
+		start := hrtime.Now()
+		_, err = m.client.Get(m.key)
+		d = hrtime.Now() - start
+	}
+	return
+}
