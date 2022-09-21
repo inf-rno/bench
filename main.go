@@ -10,6 +10,7 @@ import (
 	gomemcache "github.com/bradfitz/gomemcache/memcache"
 	redigo "github.com/gomodule/redigo/redis"
 	"github.com/loov/hrtime"
+	_ "go.uber.org/automaxprocs"
 )
 
 type config struct {
