@@ -63,7 +63,7 @@ func run(c config) {
 		}
 		t.init()
 
-		bench := newBench(c.iters)
+		bench := newBench(c.iters, c.data)
 		for j := 0; j < c.iters; j++ {
 			op, d, err := t.do()
 			if err != nil {
@@ -103,12 +103,14 @@ opLoop:
 
 type bench struct {
 	iters int
+	data  int
 	times map[string][]time.Duration
 }
 
-func newBench(c int) *bench {
+func newBench(c int, d int) *bench {
 	return &bench{
 		iters: c,
+		data:  d,
 		times: map[string][]time.Duration{},
 	}
 }
@@ -118,22 +120,9 @@ func (b *bench) appendTime(op string, d time.Duration) {
 }
 
 func (b *bench) result() map[string]*result {
-	opts := hrtime.HistogramOptions{
-		BinCount:        10,
-		NiceRange:       true,
-		ClampMaximum:    0,
-		ClampPercentile: 0.999,
-	}
 	resMap := map[string]*result{}
 	for op, times := range b.times {
-		res := &result{
-			ops:       len(times),
-			histogram: hrtime.NewDurationHistogram(times, &opts),
-		}
-		for _, t := range times {
-			res.total += t
-		}
-		resMap[op] = res
+		resMap[op] = newResult(times, b.data)
 	}
 	return resMap
 }
@@ -141,15 +130,38 @@ func (b *bench) result() map[string]*result {
 type result struct {
 	ops       int
 	total     time.Duration
+	opsps     float64
+	kbps      float64
+	gbps      float64
 	histogram *hrtime.Histogram
 }
 
+func newResult(times []time.Duration, d int) *result {
+	opts := hrtime.HistogramOptions{
+		BinCount:        10,
+		NiceRange:       true,
+		ClampMaximum:    0,
+		ClampPercentile: 0.999,
+	}
+	r := &result{
+		ops:       len(times),
+		histogram: hrtime.NewDurationHistogram(times, &opts),
+	}
+	for _, t := range times {
+		r.total += t
+	}
+	r.opsps = float64(r.ops) / (float64(r.total) / float64(time.Second))
+	r.kbps = float64(d) * r.opsps / 1000
+	r.gbps = float64(d) * 8 * r.opsps / 1000000000
+	return r
+}
+
 func (r *result) StringStats() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f;\n%s", r.ops, r.total, float64(r.ops)/(float64(r.total)/float64(time.Second)), r.histogram.StringStats())
+	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.StringStats())
 }
 
 func (r *result) String() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f;\n%s", r.ops, r.total, float64(r.ops)/(float64(r.total)/float64(time.Second)), r.histogram.String())
+	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.String())
 }
 
 type task interface {
