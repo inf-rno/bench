@@ -31,7 +31,7 @@ func main() {
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
 	key := flag.String("k", "lol", "key/prefix to use")
-	data := flag.Int("d", 32, "size of the data payload in bytes")
+	data := flag.Int("d", 32, "size of the data payload in bytes, specify 0 to not perform any writes")
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
 	protocol := flag.String("P", "redis", "protocol (redis/memcache)")
@@ -194,19 +194,20 @@ func newRedis(c config) task {
 }
 
 func (r *redis) init() {
-	_, err := r.conn.Do("SET", r.key, r.data)
-	if err != nil {
-		panic(fmt.Errorf("failed to init set: %w", err))
+	if r.data != "" {
+		_, err := r.conn.Do("SET", r.key, r.data)
+		if err != nil {
+			panic(fmt.Errorf("failed to init set: %w", err))
+		}
 	}
 }
 
 func (r *redis) do() (op string, d time.Duration, err error) {
 	rand := rand.Float64()
 	args := []any{}
-	if rand <= r.ratio {
+	if rand <= r.ratio && r.data != "" {
 		op = "SET"
 		args = append(args, r.key, r.data)
-
 	} else {
 		op = "GET"
 		args = append(args, r.key)
@@ -235,12 +236,14 @@ func newMemcache(c config) task {
 }
 
 func (m *memcache) init() {
-	m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
+	if len(m.data) != 0 {
+		m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
+	}
 }
 
 func (m *memcache) do() (op string, d time.Duration, err error) {
 	rand := rand.Float64()
-	if rand <= m.ratio {
+	if rand <= m.ratio && len(m.data) != 0 {
 		op = "SET"
 		start := hrtime.Now()
 		m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
