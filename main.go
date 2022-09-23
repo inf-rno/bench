@@ -18,6 +18,7 @@ type config struct {
 	iters       int
 	concurrency int
 	ratio       float64
+	key         string
 	data        int
 	server      string
 	port        int
@@ -29,6 +30,7 @@ func main() {
 	iters := flag.Int("n", 1000, "number of task iterations per goroutine")
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
+	key := flag.String("k", "lol", "key/prefix to use")
 	data := flag.Int("d", 32, "size of the data payload in bytes")
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
@@ -41,6 +43,7 @@ func main() {
 		iters:       *iters,
 		concurrency: *concurrency,
 		ratio:       *ratio,
+		key:         *key,
 		data:        *data,
 		server:      *server,
 		port:        *port,
@@ -56,9 +59,9 @@ func run(c config) {
 		fmt.Println("RUNNING: ", i+1)
 		var t task
 		if c.protocol == "redis" {
-			t = newRedis(c.server, c.port, c.data, c.ratio)
+			t = newRedis(c)
 		} else if c.protocol == "memcache" {
-			t = newMemcache(c.server, c.port, c.data, c.ratio)
+			t = newMemcache(c)
 		} else {
 			panic(fmt.Errorf("unknown protocol: %s", c.protocol))
 		}
@@ -177,16 +180,16 @@ type redis struct {
 	ratio float64
 }
 
-func newRedis(addr string, port int, data int, ratio float64) task {
-	c, err := redigo.DialURL(fmt.Sprintf("redis://%s:%d", addr, port))
+func newRedis(c config) task {
+	conn, err := redigo.DialURL(fmt.Sprintf("redis://%s:%d", c.server, c.port))
 	if err != nil {
 		panic(fmt.Errorf("failed to connect to redis: %w", err))
 	}
 	return &redis{
-		conn:  c,
-		key:   "lol",
-		data:  strings.Repeat("x", data),
-		ratio: ratio,
+		conn:  conn,
+		key:   c.key,
+		data:  strings.Repeat("x", c.data),
+		ratio: c.ratio,
 	}
 }
 
@@ -221,13 +224,13 @@ type memcache struct {
 	ratio  float64
 }
 
-func newMemcache(addr string, port int, data int, ratio float64) task {
-	mc := gomemcache.New(fmt.Sprintf("%s:%d", addr, port))
+func newMemcache(c config) task {
+	mc := gomemcache.New(fmt.Sprintf("%s:%d", c.server, c.port))
 	return &memcache{
 		client: mc,
-		key:    "lol",
-		data:   []byte(strings.Repeat("x", data)),
-		ratio:  ratio,
+		key:    c.key,
+		data:   []byte(strings.Repeat("x", c.data)),
+		ratio:  c.ratio,
 	}
 }
 
