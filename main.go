@@ -7,23 +7,8 @@ import (
 	"strings"
 	"time"
 
-	gomemcache "github.com/bradfitz/gomemcache/memcache"
-	redigo "github.com/gomodule/redigo/redis"
-	"github.com/loov/hrtime"
 	_ "go.uber.org/automaxprocs"
 )
-
-type config struct {
-	runs        int
-	iters       int
-	concurrency int
-	ratio       float64
-	key         string
-	data        int
-	server      string
-	port        int
-	protocol    string
-}
 
 func main() {
 	runs := flag.Int("x", 3, "number of full test iterations")
@@ -38,43 +23,29 @@ func main() {
 
 	flag.Parse()
 
-	run(config{
+	rand.Seed(time.Now().UnixNano())
+
+	c := &config{
 		runs:        *runs,
 		iters:       *iters,
 		concurrency: *concurrency,
 		ratio:       *ratio,
 		key:         *key,
-		data:        *data,
 		server:      *server,
 		port:        *port,
 		protocol:    *protocol,
-	})
+	}
+	c.dataStr = strings.Repeat("x", *data)
+	c.dataBytes = []byte(c.dataStr)
+	run(c)
 }
 
-func run(c config) {
-	rand.Seed(time.Now().UnixNano())
-
+func run(c *config) {
 	res := []map[string]*result{}
 	for i := 0; i < c.runs; i++ {
 		fmt.Println("RUNNING: ", i+1)
-		var t task
-		if c.protocol == "redis" {
-			t = newRedis(c)
-		} else if c.protocol == "memcache" {
-			t = newMemcache(c)
-		} else {
-			panic(fmt.Errorf("unknown protocol: %s", c.protocol))
-		}
-		t.init()
-
-		bench := newBench(c.iters, c.data)
-		for j := 0; j < c.iters; j++ {
-			op, d, err := t.do()
-			if err != nil {
-				panic(fmt.Errorf("failed to do task: %w", err))
-			}
-			bench.appendTime(op, d)
-		}
+		bench := newBench(c)
+		bench.run()
 		res = append(res, bench.result())
 	}
 
@@ -103,156 +74,4 @@ opLoop:
 		fmt.Println("WORST RUN: ", max+1, "\n", res[max][op].String())
 
 	}
-}
-
-type bench struct {
-	iters int
-	data  int
-	times map[string][]time.Duration
-}
-
-func newBench(c int, d int) *bench {
-	return &bench{
-		iters: c,
-		data:  d,
-		times: map[string][]time.Duration{},
-	}
-}
-
-func (b *bench) appendTime(op string, d time.Duration) {
-	b.times[op] = append(b.times[op], d)
-}
-
-func (b *bench) result() map[string]*result {
-	resMap := map[string]*result{}
-	for op, times := range b.times {
-		resMap[op] = newResult(times, b.data)
-	}
-	return resMap
-}
-
-type result struct {
-	ops       int
-	total     time.Duration
-	opsps     float64
-	kbps      float64
-	gbps      float64
-	histogram *hrtime.Histogram
-}
-
-func newResult(times []time.Duration, d int) *result {
-	opts := hrtime.HistogramOptions{
-		BinCount:        10,
-		NiceRange:       true,
-		ClampMaximum:    0,
-		ClampPercentile: 0.999,
-	}
-	r := &result{
-		ops:       len(times),
-		histogram: hrtime.NewDurationHistogram(times, &opts),
-	}
-	for _, t := range times {
-		r.total += t
-	}
-	r.opsps = float64(r.ops) / (float64(r.total) / float64(time.Second))
-	r.kbps = float64(d) * r.opsps / 1000
-	r.gbps = float64(d) * 8 * r.opsps / 1000000000
-	return r
-}
-
-func (r *result) StringStats() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.StringStats())
-}
-
-func (r *result) String() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.String())
-}
-
-type task interface {
-	init()
-	do() (string, time.Duration, error)
-}
-
-type redis struct {
-	conn  redigo.Conn
-	key   string
-	data  string
-	ratio float64
-}
-
-func newRedis(c config) task {
-	conn, err := redigo.DialURL(fmt.Sprintf("redis://%s:%d", c.server, c.port))
-	if err != nil {
-		panic(fmt.Errorf("failed to connect to redis: %w", err))
-	}
-	return &redis{
-		conn:  conn,
-		key:   c.key,
-		data:  strings.Repeat("x", c.data),
-		ratio: c.ratio,
-	}
-}
-
-func (r *redis) init() {
-	if r.data != "" {
-		_, err := r.conn.Do("SET", r.key, r.data)
-		if err != nil {
-			panic(fmt.Errorf("failed to init set: %w", err))
-		}
-	}
-}
-
-func (r *redis) do() (op string, d time.Duration, err error) {
-	rand := rand.Float64()
-	args := []any{}
-	if rand <= r.ratio && r.data != "" {
-		op = "SET"
-		args = append(args, r.key, r.data)
-	} else {
-		op = "GET"
-		args = append(args, r.key)
-	}
-	start := hrtime.Now()
-	_, err = r.conn.Do(op, args...)
-	d = hrtime.Now() - start
-	return
-}
-
-type memcache struct {
-	client *gomemcache.Client
-	key    string
-	data   []byte
-	ratio  float64
-}
-
-func newMemcache(c config) task {
-	mc := gomemcache.New(fmt.Sprintf("%s:%d", c.server, c.port))
-	return &memcache{
-		client: mc,
-		key:    c.key,
-		data:   []byte(strings.Repeat("x", c.data)),
-		ratio:  c.ratio,
-	}
-}
-
-func (m *memcache) init() {
-	if len(m.data) != 0 {
-		m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
-	}
-}
-
-func (m *memcache) do() (op string, d time.Duration, err error) {
-	rand := rand.Float64()
-	if rand <= m.ratio && len(m.data) != 0 {
-		op = "SET"
-		start := hrtime.Now()
-		m.client.Set(&gomemcache.Item{Key: m.key, Value: m.data})
-		d = hrtime.Now() - start
-	} else {
-		op = "GET"
-		start := hrtime.Now()
-		_, err = m.client.Get(m.key)
-		d = hrtime.Now() - start
-	}
-	return
 }
