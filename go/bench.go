@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/loov/hrtime"
+	"github.com/HdrHistogram/hdrhistogram-go"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -68,35 +68,28 @@ type result struct {
 	opsps     float64
 	kbps      float64
 	gbps      float64
-	histogram *hrtime.Histogram
+	p99       time.Duration
+	histogram *hdrhistogram.Histogram
 }
 
 func newResult(times []time.Duration, d int) *result {
-	opts := hrtime.HistogramOptions{
-		BinCount:        10,
-		NiceRange:       true,
-		ClampMaximum:    0,
-		ClampPercentile: 0.999,
-	}
 	r := &result{
 		ops:       len(times),
-		histogram: hrtime.NewDurationHistogram(times, &opts),
+		histogram: hdrhistogram.New(10, 60000000, 3),
 	}
 	for _, t := range times {
 		r.total += t
+		r.histogram.RecordValue(t.Microseconds())
 	}
 	r.opsps = float64(r.ops) / (float64(r.total) / float64(time.Second))
 	r.kbps = float64(d) * r.opsps / 1000
 	r.gbps = float64(d) * 8 * r.opsps / 1000000000
+	r.p99 = time.Duration(r.histogram.ValueAtPercentile(99)) * time.Microsecond
 	return r
 }
 
-func (r *result) StringStats() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.StringStats())
-}
-
 func (r *result) String() string {
-	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; KBps %.2f; Gbps %.2f\n%s", r.ops, r.total, r.opsps, r.kbps, r.gbps, r.histogram.String())
+	return fmt.Sprintf(" ops %d; total %s; ops/sec %.0f; p99: %s, KBps %.2f; Gbps %.2f\n", r.ops, r.total, r.opsps, r.p99, r.kbps, r.gbps)
 }
 
 type task interface {

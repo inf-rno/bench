@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ func main() {
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
 	protocol := flag.String("P", "redis", "protocol (redis/memcache)")
+	outDir := flag.String("o", "", "directory for hdrHistogram output)")
 
 	flag.Parse()
 
@@ -34,6 +36,7 @@ func main() {
 		server:      *server,
 		port:        *port,
 		protocol:    *protocol,
+		outDir:      *outDir,
 	}
 	c.dataStr = strings.Repeat("x", *data)
 	c.dataBytes = []byte(c.dataStr)
@@ -62,16 +65,22 @@ opLoop:
 			if r == nil || rmin == nil || rmax == nil {
 				continue opLoop
 			}
-			h := r.histogram
-			if h.P99 < rmin.histogram.P99 {
+			if r.p99 < rmin.p99 {
 				min = i
 			}
-			if h.P99 > rmax.histogram.P99 {
+			if r.p99 > rmax.p99 {
 				max = i
 			}
 		}
-		fmt.Println("BEST RUN: ", min+1, "\n", res[min][op].StringStats())
+		fmt.Println("BEST RUN: ", min+1, "\n", res[min][op].String())
 		fmt.Println("WORST RUN: ", max+1, "\n", res[max][op].String())
-
+		if c.outDir != "" {
+			f, err := os.Create(c.outDir + "/go_" + op)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+			res[max][op].histogram.PercentilesPrint(f, 10, 1000)
+		}
 	}
 }

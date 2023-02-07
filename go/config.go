@@ -13,6 +13,7 @@ type config struct {
 	server      string
 	port        int
 	protocol    string
+	outDir      string
 }
 
 func (c *config) newTask() task {
