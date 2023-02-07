@@ -11,7 +11,7 @@ import (
 )
 
 func main() {
-	runs := flag.Int("x", 3, "number of full test iterations")
+	runs := flag.Int("x", 1, "number of full test iterations")
 	iters := flag.Int("n", 1000, "number of task iterations per goroutine")
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
