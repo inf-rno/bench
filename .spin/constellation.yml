@@ -1,0 +1,4 @@
+schema: v1
+description: Run the caching benchmark tool
+repos:
+  - bench

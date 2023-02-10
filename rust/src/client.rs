@@ -26,7 +26,7 @@ impl Client {
         self.stream.flush()?;
 
         let mut response = [0; 1024];
-        let num_bytes = self.stream.read(&mut response)?;
+        let _num_bytes = self.stream.read(&mut response)?;
 
         // println!("Response: {:?}", std::str::from_utf8(&response[..num_bytes]));
 

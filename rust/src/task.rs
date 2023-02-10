@@ -44,9 +44,10 @@ struct MemRS {
 
 impl MemRS {
     fn new(c: Rc<Config>) -> Self {
+        dbg!("MEMRS");
         MemRS {
             config: c,
-            client: memcached::Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary)
+            client: memcached::Client::connect(&[("unix:///var/run/memcached/memcached.sock", 1)], ProtoType::Binary)
                 .unwrap(),
             rng: SmallRng::from_entropy(),
         }
@@ -83,9 +84,10 @@ struct RSMem {
 
 impl RSMem {
     fn new(c: Rc<Config>) -> Self {
+        dbg!("RSMEM");
         RSMem {
             config: c,
-            client: memcache::connect("memcache://127.0.0.1:11211?protocol=ascii").unwrap(),
+            client: memcache::connect("memcache:///var/run/memcached/memcached.sock?protocol=ascii").unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
@@ -116,6 +118,7 @@ struct LOCAL {
 
 impl LOCAL {
     fn new(c: Rc<Config>) -> Self {
+        dbg!("LOCAL");
         LOCAL {
             config: c,
             client: Client::connect("/var/run/memcached/memcached.sock").unwrap(),
