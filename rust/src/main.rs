@@ -2,6 +2,7 @@ use crate::task::*;
 use std::rc::Rc;
 
 mod task;
+
 pub struct Config {
     runs: i64,
     requests: i64,
@@ -40,7 +41,7 @@ fn main() {
         data_bytes: Vec::new(),
         ratio: 0.1,
         key: String::from("lol"),
-        client_type: ClientType::MEMRS,
+        client_type: ClientType::LOCAL,
     };
     c.data_string = std::iter::repeat("x")
         .take(c.data as usize)
@@ -52,5 +53,4 @@ fn main() {
     (0..c.runs).for_each(|_| {
         Bench::new(c.clone()).run();
     });
-    println!("end");
 }
