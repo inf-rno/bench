@@ -127,14 +127,6 @@ impl LOCAL {
     }
 }
 
-// let mut client = Client::connect("/var/run/memcached/memcached.sock").unwrap();
-// client.set("k", "val".as_bytes(), 0, 300).unwrap();
-// match client.get(k) {
-//     Ok(Some(value)) => println!("Value for key '{}': {:?}", k, value),
-//     Ok(None) => println!("Key '{}' not found in cache", k),
-//     Err(err) => println!("Error while retrieving key '{}': {}", k, err),
-// }
-
 impl Task for LOCAL {
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();

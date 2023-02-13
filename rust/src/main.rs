@@ -35,7 +35,7 @@ impl Bench {
 fn main() {
     let mut c = Config {
         runs: 1,
-        requests: 10,
+        requests: 1000,
         data: 32,
         data_string: String::new(),
         data_bytes: Vec::new(),
