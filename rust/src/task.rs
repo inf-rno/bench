@@ -32,7 +32,7 @@ pub fn task_factory(c: Rc<Config>) -> Box<dyn Task> {
     match &c.client_type {
         ClientType::MEMRS => return Box::new(MemRS::new(c)),
         ClientType::RSMEM => return Box::new(RSMem::new(c)),
-        ClientType::LOCAL => return Box::new(LOCAL::new(c)),
+        ClientType::LOCAL => return Box::new(Local::new(c)),
     }
 }
 
@@ -110,24 +110,24 @@ impl Task for RSMem {
     }
 }
 
-struct LOCAL {
+struct Local {
     config: Rc<Config>,
     client: client::Client,
     rng: SmallRng,
 }
 
-impl LOCAL {
+impl Local {
     fn new(c: Rc<Config>) -> Self {
         dbg!("LOCAL");
-        LOCAL {
+        Local {
             config: c,
-            client: Client::connect("/var/run/memcached/memcached.sock").unwrap(),
+            client: Client::connect("/var/run/memcached/memcached.sock", true).unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
 }
 
-impl Task for LOCAL {
+impl Task for Local {
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();
         let start = Instant::now();

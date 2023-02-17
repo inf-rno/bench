@@ -9,7 +9,7 @@ memcached-rs = "0.4.2"
 rand = { version = "0.8.5", features = ["small_rng"] }
 
 [profile.release]
-debug = 1
+debug = 2
 
 [lib]
 name = "client"
