@@ -1,6 +1,12 @@
+use crate::bench::*;
 use crate::task::*;
+use std::collections::HashMap;
+use std::fs::File;
 use std::rc::Rc;
+use std::{thread, time};
 
+mod bench;
+mod hdr;
 mod task;
 
 pub struct Config {
@@ -12,36 +18,20 @@ pub struct Config {
     ratio: f64,
     key: String,
     client_type: ClientType,
+    out_dir: String,
 }
 
-struct Bench {
-    config: Rc<Config>,
-}
-
-impl Bench {
-    fn new(c: Rc<Config>) -> Self {
-        Bench { config: c }
-    }
-
-    fn run(&self) {
-        let mut t = task_factory(self.config.clone());
-        let res = (0..self.config.requests)
-            .map(|_| t.run())
-            .collect::<Vec<_>>();
-        println!("{res:?}");
-    }
-}
-
-fn main() {
+fn main() -> std::io::Result<()> {
     let mut c = Config {
-        runs: 1,
-        requests: 1000,
-        data: 32,
+        runs: 3,
+        requests: 10000,
+        data: 1000000,
         data_string: String::new(),
         data_bytes: Vec::new(),
         ratio: 0.1,
         key: String::from("lol"),
-        client_type: ClientType::LOCAL,
+        client_type: ClientType::MEMRS,
+        out_dir: String::from("../results"),
     };
     c.data_string = std::iter::repeat("x")
         .take(c.data as usize)
@@ -50,7 +40,50 @@ fn main() {
     c.data_bytes = c.data_string.bytes().collect::<Vec<_>>();
     let c = Rc::new(c);
 
-    (0..c.runs).for_each(|_| {
-        Bench::new(c.clone()).run();
-    });
+    let (mut min_map, mut max_map) = (
+        HashMap::<String, Rc<Result>>::new(),
+        HashMap::<String, Rc<Result>>::new(),
+    );
+
+    for i in 0..c.runs {
+        println!("RUN: {i}");
+        let mut b = Bench::new(c.clone());
+        b.run();
+        for (op, r) in b.result() {
+            min_map
+                .entry(op.clone())
+                .and_modify(|e| {
+                    if r.p99 < e.p99 {
+                        *e = r.clone();
+                    }
+                })
+                .or_insert(r.clone());
+
+            max_map
+                .entry(op.clone())
+                .and_modify(|e| {
+                    if r.p99 > e.p99 {
+                        *e = r.clone();
+                    }
+                })
+                .or_insert(r.clone());
+        }
+        thread::sleep(time::Duration::from_secs(1));
+    }
+
+    println!("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~");
+    println!("\nWORST RESULT:");
+    for (op, r) in max_map {
+        println!("OP: {op} \n {r}");
+    }
+
+    println!("\nBEST RESULT:");
+    for (op, r) in min_map {
+        println!("OP: {op} \n {r}");
+        if !c.out_dir.is_empty() {
+            let file = File::create(c.out_dir.clone() + "/rs_" + &op)?;
+            r.histogram.percentiles(file)?;
+        }
+    }
+    Ok(())
 }

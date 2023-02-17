@@ -15,9 +15,10 @@ use client::Client;
 use crate::*;
 
 #[derive(Debug)]
-pub struct TaskResult(String, Duration);
+pub struct TaskResult(pub String, pub Duration);
 
 pub trait Task {
+    fn init(&mut self);
     fn run(&mut self) -> TaskResult;
 }
 
@@ -25,7 +26,7 @@ pub trait Task {
 pub enum ClientType {
     MEMRS,
     RSMEM,
-    LOCAL
+    LOCAL,
 }
 
 pub fn task_factory(c: Rc<Config>) -> Box<dyn Task> {
@@ -45,9 +46,10 @@ struct MemRS {
 impl MemRS {
     fn new(c: Rc<Config>) -> Self {
         dbg!("MEMRS");
+        //UDS format "unix:///var/run/memcached/memcached.sock"
         MemRS {
             config: c,
-            client: memcached::Client::connect(&[("unix:///var/run/memcached/memcached.sock", 1)], ProtoType::Binary)
+            client: memcached::Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary)
                 .unwrap(),
             rng: SmallRng::from_entropy(),
         }
@@ -55,6 +57,18 @@ impl MemRS {
 }
 
 impl Task for MemRS {
+    fn init(&mut self) {
+        if self.config.data_bytes.len() != 0 {
+            self.client
+                .set(
+                    self.config.key.as_bytes(),
+                    self.config.data_bytes.deref(),
+                    0,
+                    0,
+                )
+                .unwrap();
+        }
+    }
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();
         let start = Instant::now();
@@ -85,15 +99,23 @@ struct RSMem {
 impl RSMem {
     fn new(c: Rc<Config>) -> Self {
         dbg!("RSMEM");
+        //UDS format "memcache:///var/run/memcached/memcached.sock?protocol=ascii"
         RSMem {
             config: c,
-            client: memcache::connect("memcache:///var/run/memcached/memcached.sock?protocol=ascii").unwrap(),
+            client: memcache::connect("memcache://127.0.0.1:11211?protocol=ascii").unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
 }
 
 impl Task for RSMem {
+    fn init(&mut self) {
+        if self.config.data_string.len() != 0 {
+            self.client
+                .set(&self.config.key, self.config.data_string.deref(), 0)
+                .unwrap();
+        }
+    }
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();
         let start = Instant::now();
@@ -128,6 +150,18 @@ impl Local {
 }
 
 impl Task for Local {
+    fn init(&mut self) {
+        if self.config.data_string.len() != 0 {
+            self.client
+                .set(
+                    self.config.key.as_str(),
+                    self.config.data_bytes.deref(),
+                    0,
+                    0,
+                )
+                .unwrap();
+        }
+    }
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();
         let start = Instant::now();
