@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# Use this instead of /usr/bin/perf to workaround /usr/bin/perf
+# complaining that the container distro's installed
+# version of perf does not match the current (GCP) kernel.
+
+if [ "$SPIN" == 1 ]; then
+  # Skip the wrapper script by using the perf binary directly
+  exec /usr/lib/linux-tools/*/perf "$@"
+elif [ "$(uname -s)" == "Linux" ]; then
+  exec perf "$@"
+else
+  echo "Use bin/perf in spin" 1>&2
+  exit 1
+fi
