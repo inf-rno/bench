@@ -1,14 +1,49 @@
 use std::os::unix::net::UnixStream;
+use std::net::TcpStream;
 use std::io::{self, Write, Read};
 use std::str;
 
+enum Stream {
+    Unix(UnixStream),
+    Tcp(TcpStream)
+}
+
+impl Write for Stream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Stream::Unix(s) => s.write(buf),
+            Stream::Tcp(s) => s.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            Stream::Unix(s) => s.flush(),
+            Stream::Tcp(s) => s.flush(),
+        }
+    }
+}
+
+impl Read for Stream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            Stream::Unix(s) => s.read(buf),
+            Stream::Tcp(s) => s.read(buf),
+        }
+    }
+}
+
 pub struct Client {
-    stream: UnixStream,
+    stream: Stream,
 }
 
 impl Client {
-    pub fn connect(socket_addr: &str) -> std::io::Result<Self> {
-        let stream = UnixStream::connect(socket_addr)?;
+    pub fn connect(addr: &str, unix: bool) -> io::Result<Self> {
+        let stream = if unix {
+            Stream::Unix(UnixStream::connect(addr)?)
+        } else {
+            Stream::Tcp(TcpStream::connect(addr)?)
+        };
         Ok(Self { stream })
     }
 
@@ -39,36 +74,33 @@ impl Client {
         }
     }
 
-    pub fn get(&mut self, key: &str) -> io::Result<Option<String>> {
-        write!(
-            self.stream,
-            "get {}\r\n",
-            key
-        )?;
+    pub fn get(&mut self, key: &str) -> io::Result<Option<Vec<u8>>> {
+        write!(self.stream, "get {key}\r\n")?;
         self.stream.flush()?;
 
-        let mut buf = vec![0u8; 1024];
-        let n = self.stream.read(&mut buf)?;
-
-        // response is in the format: VALUE k <FLAGS> <EXP>\r\n<value>\r\nEND\r\n
-        match String::from_utf8(buf[..n].to_vec()) {
-            Ok(response) => {
-                let response_lines: Vec<&str> = response.split("\r\n").collect();
-                if response_lines.len() < 2 {
-                    return Ok(None);
-                }
-
-                let header = response_lines[0];
-                if header == "END" {
-                    return Ok(None);
-                }
-
-                let value = response_lines[1];
-                Ok(Some(value.to_string()))
-            },
-            Err(error) => {
-                Err(io::Error::new(io::ErrorKind::InvalidData, error))
+        let mut response = Vec::new();
+        let mut buf = [0u8; 4096];
+        loop {
+            let n = self.stream.read(&mut buf)?;
+            response.extend_from_slice(&buf[..n]);
+            if response.ends_with(b"\r\nEND\r\n") {
+                break;
             }
         }
+
+        let response_lines: Vec<&[u8]> = response.split(|b| *b == b'\r' || *b == b'\n').collect();
+        if response_lines.len() < 3 {
+            //better error handling here
+            return Ok(None);
+        }
+
+        let header = std::str::from_utf8(response_lines[0]).unwrap();
+        if header == "END" {
+            //better error handling here
+            return Ok(None);
+        }
+
+        let value = &response_lines[1..response_lines.len() - 2];
+        Ok(Some(value.concat()))
     }
 }
