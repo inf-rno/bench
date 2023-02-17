@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+hdrhistogram = "7.5.2"
 memcache = "0.17.0"
 memcached-rs = "0.4.2"
 rand = { version = "0.8.5", features = ["small_rng"] }

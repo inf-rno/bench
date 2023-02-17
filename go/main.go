@@ -44,43 +44,38 @@ func main() {
 }
 
 func run(c *config) {
-	res := []map[string]*result{}
+	minMap, maxMap := map[string]*result{}, map[string]*result{}
 	for i := 0; i < c.runs; i++ {
 		fmt.Println("RUNNING: ", i+1)
 		bench := newBench(c)
 		bench.run()
-		res = append(res, bench.result())
+		for op, r := range bench.result() {
+			if x, ok := minMap[op]; !ok || r.p99 < x.p99 {
+				minMap[op] = r
+			}
+			if x, ok := maxMap[op]; !ok || r.p99 > x.p99 {
+				maxMap[op] = r
+			}
+		}
+		time.Sleep(time.Second)
 	}
 
 	fmt.Println("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~")
+	fmt.Println("WORST RUN:")
+	for op, r := range maxMap {
+		fmt.Println(op, ":\n", r.String())
+	}
 
-opLoop:
-	for _, op := range []string{"SET", "GET"} {
-		fmt.Println("OP: ", op)
-		min, max := 0, 0
-		for i, r := range res {
-			r := r[op]
-			rmin := res[min][op]
-			rmax := res[max][op]
-			if r == nil || rmin == nil || rmax == nil {
-				continue opLoop
-			}
-			if r.p99 < rmin.p99 {
-				min = i
-			}
-			if r.p99 > rmax.p99 {
-				max = i
-			}
-		}
-		fmt.Println("BEST RUN: ", min+1, "\n", res[min][op].String())
-		fmt.Println("WORST RUN: ", max+1, "\n", res[max][op].String())
+	fmt.Println("BEST RUN:")
+	for op, r := range minMap {
+		fmt.Println(op, ":\n", r.String())
 		if c.outDir != "" {
 			f, err := os.Create(c.outDir + "/go_" + op)
 			if err != nil {
 				panic(err)
 			}
 			defer f.Close()
-			res[max][op].histogram.PercentilesPrint(f, 10, 1000)
+			r.histogram.PercentilesPrint(f, 10, 1000)
 		}
 	}
 }
