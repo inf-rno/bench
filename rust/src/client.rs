@@ -1,11 +1,11 @@
-use std::os::unix::net::UnixStream;
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
-use std::io::{self, Write, Read};
+use std::os::unix::net::UnixStream;
 use std::str;
 
 enum Stream {
     Unix(UnixStream),
-    Tcp(TcpStream)
+    Tcp(TcpStream),
 }
 
 impl Write for Stream {
@@ -38,8 +38,8 @@ pub struct Client {
 }
 
 impl Client {
-    pub fn connect(addr: &str, unix: bool) -> io::Result<Self> {
-        let stream = if unix {
+    pub fn connect(addr: &str) -> io::Result<Self> {
+        let stream = if addr.contains(".sock") {
             Stream::Unix(UnixStream::connect(addr)?)
         } else {
             Stream::Tcp(TcpStream::connect(addr)?)
@@ -68,8 +68,8 @@ impl Client {
             Ok(true)
         } else {
             Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            format!("memcached error: {}", response),
+                std::io::ErrorKind::Other,
+                format!("memcached error: {}", response),
             ))
         }
     }

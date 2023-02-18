@@ -12,8 +12,9 @@ type config struct {
 	dataBytes   []byte
 	server      string
 	port        int
+	socket      string
 	protocol    string
-	outDir      string
+	out         string
 }
 
 func (c *config) newTask() task {

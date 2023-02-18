@@ -12,16 +12,17 @@ import (
 )
 
 func main() {
-	runs := flag.Int("x", 1, "number of full test iterations")
-	iters := flag.Int("n", 1000, "number of task iterations per goroutine")
+	runs := flag.Int("x", 3, "number of full test iterations")
+	iters := flag.Int("n", 10000, "number of task iterations per goroutine")
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
 	key := flag.String("k", "lol", "key/prefix to use")
-	data := flag.Int("d", 32, "size of the data payload in bytes, specify 0 to not perform any writes")
+	data := flag.Int("d", 100000, "size of the data payload in bytes, specify 0 to not perform any writes")
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
+	socket := flag.String("S", "", "unix domain socket name")
 	protocol := flag.String("P", "redis", "protocol (redis/memcache)")
-	outDir := flag.String("o", "", "directory for hdrHistogram output)")
+	out := flag.String("o", "", "output prefix for hdrHistogram files)")
 
 	flag.Parse()
 
@@ -35,8 +36,9 @@ func main() {
 		key:         *key,
 		server:      *server,
 		port:        *port,
+		socket:      *socket,
 		protocol:    *protocol,
-		outDir:      *outDir,
+		out:         *out,
 	}
 	c.dataStr = strings.Repeat("x", *data)
 	c.dataBytes = []byte(c.dataStr)
@@ -69,8 +71,8 @@ func run(c *config) {
 	fmt.Println("BEST RUN:")
 	for op, r := range minMap {
 		fmt.Println(op, ":\n", r.String())
-		if c.outDir != "" {
-			f, err := os.Create(c.outDir + "/go_" + op)
+		if c.out != "" {
+			f, err := os.Create(c.out + "_go_" + op)
 			if err != nil {
 				panic(err)
 			}
