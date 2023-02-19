@@ -15,7 +15,11 @@ type memcache struct {
 }
 
 func newMemcache(c *config) task {
-	mc := gomemcache.New(fmt.Sprintf("%s:%d", c.server, c.port))
+	addr := fmt.Sprintf("%s:%d", c.server, c.port)
+	if c.socket != "" {
+		addr = c.socket
+	}
+	mc := gomemcache.New(addr)
 	return &memcache{
 		client: mc,
 		config: c,

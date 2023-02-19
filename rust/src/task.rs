@@ -23,6 +23,7 @@ pub trait Task {
 }
 
 #[allow(dead_code)]
+#[derive(clap::ValueEnum, Debug, Clone)]
 pub enum ClientType {
     MEMRS,
     RSMEM,
@@ -46,11 +47,13 @@ struct MemRS {
 impl MemRS {
     fn new(c: Rc<Config>) -> Self {
         dbg!("MEMRS");
-        //UDS format "unix:///var/run/memcached/memcached.sock"
+        let mut addr = format!("tcp://{}:{}", c.server, c.port);
+        if !c.socket.is_empty() {
+            addr = format!("unix://{}", c.socket)
+        }
         MemRS {
             config: c,
-            client: memcached::Client::connect(&[("tcp://127.0.0.1:11211", 1)], ProtoType::Binary)
-                .unwrap(),
+            client: memcached::Client::connect(&[(addr, 1)], ProtoType::Binary).unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
@@ -99,10 +102,13 @@ struct RSMem {
 impl RSMem {
     fn new(c: Rc<Config>) -> Self {
         dbg!("RSMEM");
-        //UDS format "memcache:///var/run/memcached/memcached.sock?protocol=ascii"
+        let mut addr = format!("memcache://{}:{}?protocol=ascii", c.server, c.port);
+        if !c.socket.is_empty() {
+            addr = format!("memcache://{}?protocol=ascii", c.socket)
+        }
         RSMem {
             config: c,
-            client: memcache::connect("memcache://127.0.0.1:11211?protocol=ascii").unwrap(),
+            client: memcache::connect(addr).unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
@@ -141,9 +147,13 @@ struct Local {
 impl Local {
     fn new(c: Rc<Config>) -> Self {
         dbg!("LOCAL");
+        let mut addr = format!("{}:{}", c.server, c.port);
+        if !c.socket.is_empty() {
+            addr = c.socket.clone()
+        }
         Local {
             config: c,
-            client: Client::connect("/var/run/memcached/memcached.sock", true).unwrap(),
+            client: Client::connect(&addr).unwrap(),
             rng: SmallRng::from_entropy(),
         }
     }
