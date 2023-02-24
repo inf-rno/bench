@@ -9,13 +9,11 @@ hdrhistogram = "7.5.2"
 memcache = "0.17.0"
 memcached-rs = "0.4.2"
 rand = { version = "0.8.5", features = ["small_rng"] }
+tokio = { version = "1.25.0", features = ["full"] }
+tokio-uring = "0.4.0"
 
 [profile.release]
-debug = 2
-
-[lib]
-name = "client"
-path = "src/client.rs"
+debug = 3
 
 [[bin]]
 name = "bench"

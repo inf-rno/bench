@@ -1,64 +1,63 @@
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::io::{self, AsyncWrite, AsyncRead, ReadBuf, AsyncWriteExt, AsyncReadExt};
+use tokio::io::{self, AsyncWrite, AsyncRead, ReadBuf, AsyncWriteExt, AsyncReadExt, ErrorKind};
 use tokio::net::{TcpStream, UnixStream};
-use std::io::{ErrorKind};
 
-enum Stream {
+enum AsyncStream {
     Unix(UnixStream),
     Tcp(TcpStream),
 }
 
-impl AsyncWrite for Stream {
+impl AsyncWrite for AsyncStream {
     fn poll_write(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<Result<usize, io::Error>> {
         match self.get_mut() {
-            Stream::Unix(s) => Pin::new(s).poll_write(cx, buf),
-            Stream::Tcp(s) => Pin::new(s).poll_write(cx, buf),
+            AsyncStream::Unix(s) => Pin::new(s).poll_write(cx, buf),
+            AsyncStream::Tcp(s) => Pin::new(s).poll_write(cx, buf),
         }
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match self.get_mut() {
-            Stream::Unix(s) => Pin::new(s).poll_flush(cx),
-            Stream::Tcp(s) => Pin::new(s).poll_flush(cx),
+            AsyncStream::Unix(s) => Pin::new(s).poll_flush(cx),
+            AsyncStream::Tcp(s) => Pin::new(s).poll_flush(cx),
         }
     }
 
     fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), io::Error>> {
         match self.get_mut() {
-            Stream::Unix(s) => Pin::new(s).poll_shutdown(cx),
-            Stream::Tcp(s) => Pin::new(s).poll_shutdown(cx),
+            AsyncStream::Unix(s) => Pin::new(s).poll_shutdown(cx),
+            AsyncStream::Tcp(s) => Pin::new(s).poll_shutdown(cx),
         }
     }
 }
 
-impl AsyncRead for Stream {
+impl AsyncRead for AsyncStream {
     fn poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context,
         buf: &mut ReadBuf,
     ) -> Poll<io::Result<()>> {
         match self.get_mut() {
-            Stream::Unix(s) => Pin::new(s).poll_read(cx, buf),
-            Stream::Tcp(s) => Pin::new(s).poll_read(cx, buf),
+            AsyncStream::Unix(s) => Pin::new(s).poll_read(cx, buf),
+            AsyncStream::Tcp(s) => Pin::new(s).poll_read(cx, buf),
         }
     }
 }
 
-pub struct Client {
-    stream: Pin<Box<Stream>>,
+pub struct AsyncClient {
+    stream: Pin<Box<AsyncStream>>,
 }
 
-impl Client {
-    pub async fn connect(addr: &str, unix: bool) -> std::io::Result<Self> {
-        let stream = if unix {
-            Stream::Unix(UnixStream::connect(addr).await?)
+impl AsyncClient {
+    pub async fn connect(addr: &str) -> std::io::Result<Self> {
+        let stream = if addr.contains(".sock") {
+            AsyncStream::Unix(UnixStream::connect(addr).await?)
         } else {
-            Stream::Tcp(TcpStream::connect(addr).await?)
+            AsyncStream::Tcp(TcpStream::connect(addr).await?)
         };
         Ok(Self { stream: Box::pin(stream) })
     }

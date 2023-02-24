@@ -9,6 +9,9 @@ use std::{thread, time};
 mod bench;
 mod hdr;
 mod task;
+mod async_client;
+mod uring;
+mod client;
 
 #[derive(Parser, Debug)]
 pub struct Config {

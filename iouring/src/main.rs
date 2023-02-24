@@ -1,15 +1,13 @@
-use iouring::Client;
+use iouring::UringClient;
 
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
     let (key, val) = ("foo", "bar");
 
     tokio_uring::start(async {
-        let mut client = Client::connect("127.0.0.1:11211", false).await.unwrap();
+        let mut client = UringClient::connect("/var/run/memcached/memcached.sock").await.unwrap();
         client.set(key, val.as_bytes(), 0, 0).await.unwrap();
 
         let v = client.get("foo").await.unwrap().unwrap();
         assert_eq!(v, val.as_bytes());
-
-        Ok(())
     });
 }
