@@ -1,0 +1,74 @@
+#!/bin/sh
+PWD=$(pwd)
+outPre="$PWD/results"
+log="$outPre/log"
+mtDir="/usr/local/bin"
+goDir="$PWD/go"
+rsDir="$PWD/rust"
+rbDir="$PWD/rb"
+
+header()
+{
+    echo $@
+    (
+        echo "\n========================================================="
+        echo $@
+        echo "=========================================================\n"
+    ) >> $log
+} 
+
+mkdir -p $outPre
+: > $log
+
+
+for i in "100 100B" "1000 1KB" "10000 10KB" "100000 100KB" "500000 500KB" "1000000 1MB"
+do
+    read size sizeStr <<< "${i}"
+    echo "${sizeStr}"
+    
+    
+    cd $mtDir
+    header "memtier"
+    (
+        set -x
+        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_mt -P memcache_text  -p 11211
+        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_UDS_mt -P memcache_text  -S /var/run/memcached/memcached.sock
+    ) >> $log 2>&1
+
+    cd $goDir
+    header "go"
+    (
+        set -x
+        go run . -n 10000 -d $size -P memcache -o ${outPre}/${sizeStr} -p 11211
+        go run . -n 10000 -d $size -P memcache -o ${outPre}/${sizeStr}_UDS -S /var/run/memcached/memcached.sock
+        
+    ) >> $log 2>&1
+
+    cd $rsDir
+    header "rust"
+    (
+        set -x
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_rsmem -t rsmem
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_memrs -t memrs
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_basic -t basic
+
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_UDS_rsmem -t rsmem -S /var/run/memcached/memcached.sock
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_UDS_memrs -t memrs -S /var/run/memcached/memcached.sock
+        cargo run --release -- -n 10000 -d $size -o ${outPre}/${sizeStr}_UDS_basic -t basic -S /var/run/memcached/memcached.sock        
+    ) >> $log 2>&1
+    
+    cd $rbDir
+    header "rb"
+    (
+        set -x
+        
+        bundle exec bench.rb -n 10000 -d $size -o ${outPre}/${sizeStr}_dalli
+        bundle exec bench.rb -n 10000 -d $size -o ${outPre}/${sizeStr}_UDS_dalli -S /var/run/memcached/memcached.sock
+        bundle exec bench.rb -n 10000 -d $size -t lmdb -o ${outPre}/${sizeStr}_lmdb
+        
+    ) >> $log 2>&1
+done
+
+rm ${outPre}/*.hgrm 
+rm ${outPre}/*FULL*
+find ${outPre} -name '*command_run*' -exec bash -c ' mv $0 ${0/_command_run*.txt/}' {} \;

@@ -31,7 +31,7 @@ pub struct Config {
     /// Key/prefix to use
     #[arg(short = 'k', long, default_value = "lol")]
     key: String,
-    /// Key/prefix to use
+    /// Client type to use (MEMRS, RSMEM, BASIC)
     #[arg(short = 't', long, value_enum, default_value_t = ClientType::MEMRS)]
     client_type: ClientType,
     /// output prefix for hdrHistogram files
@@ -70,7 +70,7 @@ fn main() -> std::io::Result<()> {
             min_map
                 .entry(op.clone())
                 .and_modify(|e| {
-                    if r.p99 < e.p99 {
+                    if r.opsps < e.opsps {
                         *e = r.clone();
                     }
                 })
@@ -79,7 +79,7 @@ fn main() -> std::io::Result<()> {
             max_map
                 .entry(op.clone())
                 .and_modify(|e| {
-                    if r.p99 > e.p99 {
+                    if r.opsps > e.opsps {
                         *e = r.clone();
                     }
                 })
@@ -90,16 +90,17 @@ fn main() -> std::io::Result<()> {
 
     println!("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~");
     println!("\nWORST RESULT:");
-    for (op, r) in max_map {
+    for (op, r) in min_map {
         println!("OP: {op} \n {r}");
     }
 
     println!("\nBEST RESULT:");
-    for (op, r) in min_map {
+    for (op, r) in max_map {
         println!("OP: {op} \n {r}");
         if !c.out.is_empty() {
             let file = File::create(c.out.clone() + "_rs_" + &op)?;
             r.histogram.percentiles(file)?;
+            // r.histogram.serialize(file);
         }
     }
     Ok(())

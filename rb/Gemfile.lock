@@ -1,0 +1,52 @@
+GIT
+  remote: https://github.com/Shopify/lmdb.git
+  revision: 06c7c6f998a930e4d3fea9417cc2247aa848fccf
+  branch: fix-use-after-free-bug
+  specs:
+    lmdb (0.5.3)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    HDRHistogram (0.1.11)
+    activemodel (7.0.4.2)
+      activesupport (= 7.0.4.2)
+    activerecord (7.0.4.2)
+      activemodel (= 7.0.4.2)
+      activesupport (= 7.0.4.2)
+    activesupport (7.0.4.2)
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+      i18n (>= 1.6, < 2)
+      minitest (>= 5.1)
+      tzinfo (~> 2.0)
+    concurrent-ruby (1.2.2)
+    dalli (3.2.4)
+    i18n (1.12.0)
+      concurrent-ruby (~> 1.0)
+    minitest (5.17.0)
+    msgpack (1.6.0)
+    paquito (0.10.0)
+      msgpack (>= 1.5.2)
+    snappy (0.3.0)
+    sorbet (0.5.10689)
+      sorbet-static (= 0.5.10689)
+    sorbet-runtime (0.5.10689)
+    sorbet-static (0.5.10689-universal-darwin-21)
+    tzinfo (2.0.6)
+      concurrent-ruby (~> 1.0)
+
+PLATFORMS
+  arm64-darwin-21
+
+DEPENDENCIES
+  HDRHistogram
+  activerecord
+  dalli
+  lmdb!
+  paquito (~> 0.10.0)
+  snappy
+  sorbet
+  sorbet-runtime
+
+BUNDLED WITH
+   2.3.24
