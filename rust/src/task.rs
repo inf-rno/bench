@@ -27,14 +27,14 @@ pub trait Task {
 pub enum ClientType {
     MEMRS,
     RSMEM,
-    LOCAL,
+    BASIC,
 }
 
 pub fn task_factory(c: Rc<Config>) -> Box<dyn Task> {
     match &c.client_type {
         ClientType::MEMRS => return Box::new(MemRS::new(c)),
         ClientType::RSMEM => return Box::new(RSMem::new(c)),
-        ClientType::LOCAL => return Box::new(Local::new(c)),
+        ClientType::BASIC => return Box::new(Basic::new(c)),
     }
 }
 
@@ -138,20 +138,20 @@ impl Task for RSMem {
     }
 }
 
-struct Local {
+struct Basic {
     config: Rc<Config>,
     client: client::Client,
     rng: SmallRng,
 }
 
-impl Local {
+impl Basic {
     fn new(c: Rc<Config>) -> Self {
-        dbg!("LOCAL");
+        dbg!("Basic");
         let mut addr = format!("{}:{}", c.server, c.port);
         if !c.socket.is_empty() {
             addr = c.socket.clone()
         }
-        Local {
+        Basic {
             config: c,
             client: Client::connect(&addr).unwrap(),
             rng: SmallRng::from_entropy(),
@@ -159,7 +159,7 @@ impl Local {
     }
 }
 
-impl Task for Local {
+impl Task for Basic {
     fn init(&mut self) {
         if self.config.data_string.len() != 0 {
             self.client

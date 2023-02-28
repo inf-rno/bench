@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+
+git_source(:shopify) do |name|
+  "https://github.com/Shopify/#{name}.git"
+end
+
+# Specify development dependencies here
+gem "HDRHistogram"
+gem "dalli"
+gem "activerecord"
+gem "paquito", "~> 0.10.0"
+gem "snappy"
+gem "sorbet", group: :development
+gem "sorbet-runtime"
+gem "lmdb", shopify: "lmdb", branch: "fix-use-after-free-bug" # https://github.com/doriantaylor/lmdb/pull/1

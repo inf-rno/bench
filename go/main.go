@@ -52,10 +52,10 @@ func run(c *config) {
 		bench := newBench(c)
 		bench.run()
 		for op, r := range bench.result() {
-			if x, ok := minMap[op]; !ok || r.p99 < x.p99 {
+			if x, ok := minMap[op]; !ok || r.opsps < x.opsps {
 				minMap[op] = r
 			}
-			if x, ok := maxMap[op]; !ok || r.p99 > x.p99 {
+			if x, ok := maxMap[op]; !ok || r.opsps > x.opsps {
 				maxMap[op] = r
 			}
 		}
@@ -64,12 +64,12 @@ func run(c *config) {
 
 	fmt.Println("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~")
 	fmt.Println("WORST RUN:")
-	for op, r := range maxMap {
+	for op, r := range minMap {
 		fmt.Println(op, ":\n", r.String())
 	}
 
 	fmt.Println("BEST RUN:")
-	for op, r := range minMap {
+	for op, r := range maxMap {
 		fmt.Println(op, ":\n", r.String())
 		if c.out != "" {
 			f, err := os.Create(c.out + "_go_" + op)
