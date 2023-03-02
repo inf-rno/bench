@@ -42,7 +42,7 @@ impl HDR {
                         "{:12} {:1.*} {:10} {:14.2}\n",
                         v.value_iterated_to() as f64 / 1000.0,
                         quantile_precision,
-                        v.quantile(),
+                        v.quantile_iterated_to(),
                         sum,
                         1_f64 / (1_f64 - v.quantile_iterated_to())
                     )
@@ -54,7 +54,7 @@ impl HDR {
                         "{:12} {:1.*} {:10} {:>14}\n",
                         v.value_iterated_to() as f64 / 1000.0,
                         quantile_precision,
-                        v.quantile(),
+                        v.quantile_iterated_to(),
                         sum,
                         "∞"
                     )
@@ -82,11 +82,17 @@ impl HDR {
         write_extra_data(
             &mut writer,
             "Mean",
-            hist.mean(),
+            hist.mean() / 1000.0,
             "StdDeviation",
-            hist.stdev(),
+            hist.stdev() / 1000.0,
         )?;
-        write_extra_data(&mut writer, "Max", hist.max(), "Total count", hist.len())?;
+        write_extra_data(
+            &mut writer,
+            "Max",
+            hist.max() as f64 / 1000.0,
+            "Total count",
+            hist.len(),
+        )?;
         write_extra_data(
             &mut writer,
             "Buckets",

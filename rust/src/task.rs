@@ -10,9 +10,7 @@ use memcached::proto::{Operation, ProtoType};
 
 use memcache;
 
-use client::Client;
-use async_client::AsyncClient;
-use uring::UringClient;
+use basic::Client;
 
 use crate::*;
 
@@ -24,39 +22,19 @@ pub trait Task {
     fn run(&mut self) -> TaskResult;
 }
 
-pub trait AsyncTask {
-    async fn init(&mut self);
-    async fn run(&mut self) -> TaskResult;
-}
-
-#[allow(dead_code)]
-#[derive(clap::Parser, Debug, Clone)]
-pub enum ClientType {
-    Sync(SyncClientType),
-    Async(AsyncClientType),
-}
-
 #[allow(dead_code)]
 #[derive(clap::ValueEnum, Debug, Clone)]
-pub enum SyncClientType {
+pub enum ClientType {
     MEMRS,
     RSMEM,
     LOCAL,
-    ASYNC,
-    URING,
-}
-
-#[allow(dead_code)]
-#[derive(clap::ValueEnum, Debug, Clone)]
-pub enum AsyncClientType {
-    ASYNC,
-    URING,
 }
 
 pub fn task_factory(c: Rc<Config>) -> Box<dyn Task> {
     match &c.client_type {
-        ClientType::Sync(t) => return sync_task_factory(c, t),
-        ClientType::Async(t) => return async_task_factory(c, t),
+        ClientType::MEMRS => return Box::new(MemRS::new(c)),
+        ClientType::RSMEM => return Box::new(RSMem::new(c)),
+        ClientType::LOCAL => return Box::new(Local::new(c)),
     }
 }
 
@@ -162,7 +140,7 @@ impl Task for RSMem {
 
 struct Local {
     config: Rc<Config>,
-    client: Client,
+    client: basic::Client,
     rng: SmallRng,
 }
 
@@ -182,61 +160,6 @@ impl Local {
 }
 
 impl Task for Local {
-    fn init(&mut self) {
-        if self.config.data_string.len() != 0 {
-            self.client
-                .set(
-                    self.config.key.as_str(),
-                    self.config.data_bytes.deref(),
-                    0,
-                    0,
-                )
-                .unwrap();
-        }
-    }
-    fn run(&mut self) -> TaskResult {
-        let r: f64 = self.rng.gen();
-        let start = Instant::now();
-        let op = if r < self.config.ratio {
-            self.client
-                .set(
-                    self.config.key.as_str(),
-                    self.config.data_bytes.deref(),
-                    0,
-                    0,
-                )
-                .unwrap();
-            "SET"
-        } else {
-            self.client.get(self.config.key.as_str()).unwrap();
-            "GET"
-        };
-        TaskResult(op.into(), start.elapsed())
-    }
-}
-
-struct Async {
-    config: Rc<Config>,
-    client: AsyncClient,
-    rng: SmallRng,
-}
-
-impl Async {
-    async fn new(c: Rc<Config>) -> Self {
-        dbg!("ASYNC");
-        let mut addr = format!("{}:{}", c.server, c.port);
-        if !c.socket.is_empty() {
-            addr = c.socket.clone()
-        }
-        Async {
-            config: c,
-            client: AsyncClient::connect(&addr).await.unwrap(),
-            rng: SmallRng::from_entropy(),
-        }
-    }
-}
-
-impl Task for Async {
     fn init(&mut self) {
         if self.config.data_string.len() != 0 {
             self.client

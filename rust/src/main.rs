@@ -11,7 +11,7 @@ use std::{thread, time};
 mod bench;
 mod hdr;
 mod task;
-mod client;
+mod basic;
 
 #[derive(Parser, Debug)]
 pub struct Config {
@@ -73,7 +73,7 @@ fn main() -> std::io::Result<()> {
             min_map
                 .entry(op.clone())
                 .and_modify(|e| {
-                    if r.p99 < e.p99 {
+                    if r.opsps < e.opsps {
                         *e = r.clone();
                     }
                 })
@@ -82,7 +82,7 @@ fn main() -> std::io::Result<()> {
             max_map
                 .entry(op.clone())
                 .and_modify(|e| {
-                    if r.p99 > e.p99 {
+                    if r.opsps > e.opsps {
                         *e = r.clone();
                     }
                 })
@@ -93,16 +93,17 @@ fn main() -> std::io::Result<()> {
 
     println!("~~~~~~~~~~~~~~~~~~~RESULTS~~~~~~~~~~~~~~~~");
     println!("\nWORST RESULT:");
-    for (op, r) in max_map {
+    for (op, r) in min_map {
         println!("OP: {op} \n {r}");
     }
 
     println!("\nBEST RESULT:");
-    for (op, r) in min_map {
+    for (op, r) in max_map {
         println!("OP: {op} \n {r}");
         if !c.out.is_empty() {
             let file = File::create(c.out.clone() + "_rs_" + &op)?;
             r.histogram.percentiles(file)?;
+            // r.histogram.serialize(file);
         }
     }
     Ok(())
