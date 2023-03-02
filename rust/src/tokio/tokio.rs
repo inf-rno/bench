@@ -113,8 +113,6 @@ impl TokioClient {
             return Err(ErrorKind::InvalidData.into());
         }
 
-        let value = &response_lines[1..response_lines.len() - 2];
-        dbg!(value.concat());
-        Ok(Some(value.concat()))
+        Ok(Some(response_lines[2].to_vec()))
     }
 }
