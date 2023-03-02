@@ -1,3 +1,5 @@
+#![feature(async_fn_in_trait)]
+
 use crate::bench::*;
 use crate::task::*;
 use clap::Parser;
@@ -9,8 +11,6 @@ use std::{thread, time};
 mod bench;
 mod hdr;
 mod task;
-mod async_client;
-mod uring;
 mod client;
 
 #[derive(Parser, Debug)]
@@ -34,8 +34,8 @@ pub struct Config {
     /// Key/prefix to use
     #[arg(short = 'k', long, default_value = "lol")]
     key: String,
-    /// Key/prefix to use
-    #[arg(short = 't', long, value_enum, default_value_t = ClientType::MEMRS)]
+    /// Client to use
+    #[arg(short = 't', long, value_enum, default_value_t = ClientType::Sync(SyncClientType::MEMRS))]
     client_type: ClientType,
     /// output prefix for hdrHistogram files
     #[arg(short = 'o', long, default_value = "")]

@@ -24,9 +24,21 @@ pub trait Task {
     fn run(&mut self) -> TaskResult;
 }
 
+pub trait AsyncTask {
+    async fn init(&mut self);
+    async fn run(&mut self) -> TaskResult;
+}
+
+#[allow(dead_code)]
+#[derive(clap::Parser, Debug, Clone)]
+pub enum ClientType {
+    Sync(SyncClientType),
+    Async(AsyncClientType),
+}
+
 #[allow(dead_code)]
 #[derive(clap::ValueEnum, Debug, Clone)]
-pub enum ClientType {
+pub enum SyncClientType {
     MEMRS,
     RSMEM,
     LOCAL,
@@ -34,13 +46,17 @@ pub enum ClientType {
     URING,
 }
 
+#[allow(dead_code)]
+#[derive(clap::ValueEnum, Debug, Clone)]
+pub enum AsyncClientType {
+    ASYNC,
+    URING,
+}
+
 pub fn task_factory(c: Rc<Config>) -> Box<dyn Task> {
     match &c.client_type {
-        ClientType::MEMRS => return Box::new(MemRS::new(c)),
-        ClientType::RSMEM => return Box::new(RSMem::new(c)),
-        ClientType::LOCAL => return Box::new(Local::new(c)),
-        ClientType::ASYNC => return Box::new(Async::new(c)),
-        ClientType::URING => return Box::new(Uring::new(c)),
+        ClientType::Sync(t) => return sync_task_factory(c, t),
+        ClientType::Async(t) => return async_task_factory(c, t),
     }
 }
 
