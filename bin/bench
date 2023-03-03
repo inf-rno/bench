@@ -74,4 +74,4 @@ done
 
 rm ${outPre}/*.hgrm
 rm ${outPre}/*FULL*
-find ${outPre} -name '*command_run*' -exec bash -c ' mv $0 ${0/_command_run*.txt/}' {} \;
+find ${outPre} -name '*command_run*' -exec bash -c ' mv $0 ${0/_command_run*.txt/}' {}
