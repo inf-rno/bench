@@ -102,9 +102,9 @@ struct RSMem {
 impl RSMem {
     fn new(c: Rc<Config>) -> Self {
         dbg!("RSMEM");
-        let mut addr = format!("memcache://{}:{}?protocol=ascii", c.server, c.port);
+        let mut addr = format!("memcache://{}:{}?protocol=binary", c.server, c.port);
         if !c.socket.is_empty() {
-            addr = format!("memcache://{}?protocol=ascii", c.socket)
+            addr = format!("memcache://{}?protocol=binary", c.socket)
         }
         RSMem {
             config: c,

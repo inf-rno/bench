@@ -34,8 +34,8 @@ do
     header "memtier"
     (
         set -x
-        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_mt -P memcache_text  -p 11211 -s $addr
-        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_UDS_mt -P memcache_text  -S /var/run/memcached/memcached.sock
+        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_mt -P memcache_binary  -p 11211 -s $addr
+        memtier_benchmark -n 10000 -c 1 -t 1 -x 1 -d $size --key-minimum 1 --key-maximum 1 --key-prefix lol --hide-histogram --hdr-file-prefix=${outPre}/${sizeStr}_UDS_mt -P memcache_binary  -S /var/run/memcached/memcached.sock
     ) >> $log 2>&1
     
     cd $goDir
@@ -74,4 +74,4 @@ done
 
 rm ${outPre}/*.hgrm
 rm ${outPre}/*FULL*
-find ${outPre} -name '*command_run*' -exec bash -c ' mv $0 ${0/_command_run*.txt/}' {}
+find ${outPre} -name '*command_run*' -exec sh -c ' mv $0 ${0/_command_run*.txt/}' {} \;
