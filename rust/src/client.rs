@@ -1,7 +1,7 @@
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::os::unix::net::UnixStream;
-use std::str;
+use std::{str, io::ErrorKind};
 
 enum Stream {
     Unix(UnixStream),
@@ -90,17 +90,14 @@ impl Client {
 
         let response_lines: Vec<&[u8]> = response.split(|b| *b == b'\r' || *b == b'\n').collect();
         if response_lines.len() < 3 {
-            //better error handling here
-            return Ok(None);
+            return Err(ErrorKind::InvalidData.into());
         }
 
         let header = std::str::from_utf8(response_lines[0]).unwrap();
         if header == "END" {
-            //better error handling here
-            return Ok(None);
+            return Err(ErrorKind::InvalidData.into());
         }
 
-        let value = &response_lines[1..response_lines.len() - 2];
-        Ok(Some(value.concat()))
+        Ok(Some(response_lines[2].to_vec()))
     }
 }
