@@ -1,0 +1,11 @@
+#!/bin/sh
+set -eu
+apk add git go cargo ruby ruby-dev snappy-dev
+apk add build-base autoconf automake pcre-dev libevent-dev pkgconfig zlib-dev libressl-dev
+gem install bundler
+
+cd && git clone https://github.com/RedisLabs/memtier_benchmark && cd memtier_benchmark && autoreconf -ivf && ./configure && make && make install
+cd && git clone http://github.com/inf-rno/bench && cd bench
+
+cd rb
+bundle install
