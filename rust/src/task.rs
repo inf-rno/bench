@@ -62,31 +62,69 @@ impl MemRS {
 impl Task for MemRS {
     fn init(&mut self) {
         if self.config.data_bytes.len() != 0 {
-            self.client
-                .set(
-                    self.config.key.as_bytes(),
-                    self.config.data_bytes.deref(),
-                    0,
-                    0,
-                )
-                .unwrap();
+            if let Some(chunk_size) = self.config.chunk_size {
+                let chunks = self.config.data_bytes.chunks(chunk_size as usize);
+                self.client
+                    .set(
+                        self.config.key.as_bytes(),
+                        chunks.len().to_string().as_bytes(),
+                        0,
+                        0,
+                    )
+                    .unwrap();
+            } else {
+                self.client
+                    .set(
+                        self.config.key.as_bytes(),
+                        self.config.data_bytes.deref(),
+                        0,
+                        0,
+                    )
+                    .unwrap();
+            }
         }
     }
     fn run(&mut self) -> TaskResult {
         let r: f64 = self.rng.gen();
         let start = Instant::now();
         let op = if r < self.config.ratio {
-            self.client
-                .set(
-                    self.config.key.as_bytes(),
-                    self.config.data_bytes.deref(),
-                    0,
-                    0,
-                )
-                .unwrap();
+            if let Some(chunk_size) = self.config.chunk_size {
+                let chunks = self.config.data_bytes.chunks(chunk_size as usize);
+                self.client
+                    .set(
+                        self.config.key.as_bytes(),
+                        chunks.len().to_string().as_bytes(),
+                        0,
+                        0,
+                    )
+                    .unwrap();
+                for (i, chunk) in chunks.enumerate() {
+                    let key = format!("{}.{}", self.config.key, i);
+                    self.client.set(key.as_bytes(), chunk, 0, 0).unwrap();
+                }
+            } else {
+                self.client
+                    .set(
+                        self.config.key.as_bytes(),
+                        self.config.data_bytes.deref(),
+                        0,
+                        0,
+                    )
+                    .unwrap();
+            }
             "SET"
         } else {
-            self.client.get(self.config.key.as_bytes()).unwrap();
+            if let Some(_) = self.config.chunk_size {
+                let chunk_count_bytes = self.client.get(self.config.key.as_bytes()).unwrap();
+                let chunk_count_str = std::str::from_utf8(&chunk_count_bytes.0).unwrap();
+                let chunk_count: usize = chunk_count_str.parse().unwrap();
+                for i in 0..chunk_count {
+                    let key = format!("{}.{}", self.config.key, i);
+                    self.client.get(key.as_bytes()).unwrap();
+                }
+            } else {
+                self.client.get(self.config.key.as_bytes()).unwrap();
+            }
             "GET"
         };
         TaskResult(op.into(), start.elapsed())
