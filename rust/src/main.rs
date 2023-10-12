@@ -16,15 +16,18 @@ pub struct Config {
     #[arg(short = 'x', long, default_value_t = 3)]
     runs: i64,
     /// Number of requests per thread
-    #[arg(short = 'n', long, default_value_t = 10000)]
+    #[arg(short = 'n', long, default_value_t = 10_000)]
     requests: i64,
     /// Size of the data payload in bytes, specify 0 to not perform any writes
-    #[arg(short = 'd', long, default_value_t = 100000)]
+    #[arg(short = 'd', long, default_value_t = 100_000)]
     data: i64,
     #[arg(skip)]
     data_string: String,
     #[arg(skip)]
     data_bytes: Vec<u8>,
+    /// Optional chunk size in bytes
+    #[arg(short = 'c', long)]
+    chunk_size: Option<i64>,
     /// Ratio of ops (eg. 0.1 == 10% sets && 90% gets)
     #[arg(short = 'r', long, default_value_t = 0.1)]
     ratio: f64,
