@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::Deref;
 use std::rc::Rc;
 
@@ -6,7 +7,7 @@ use rand::{Rng, SeedableRng};
 use std::time::{Duration, Instant};
 
 use memcached;
-use memcached::proto::{Operation, ProtoType};
+use memcached::proto::{MultiOperation, Operation, ProtoType};
 
 use memcache;
 
@@ -98,10 +99,16 @@ impl Task for MemRS {
                         0,
                     )
                     .unwrap();
+                let mut kv: BTreeMap<&[u8], (&[u8], u32, u32)> = BTreeMap::new();
                 for (i, chunk) in chunks.enumerate() {
-                    let key = format!("{}.{}", self.config.key, i);
-                    self.client.set(key.as_bytes(), chunk, 0, 0).unwrap();
+                    let k = unsafe {
+                        std::mem::transmute::<&[u8], &'static [u8]>(
+                            format!("{}.{}", self.config.key, i).as_bytes(),
+                        )
+                    };
+                    kv.insert(k, (chunk, 0, 0));
                 }
+                self.client.set_multi(kv).unwrap();
             } else {
                 self.client
                     .set(
@@ -118,10 +125,15 @@ impl Task for MemRS {
                 let chunk_count_bytes = self.client.get(self.config.key.as_bytes()).unwrap();
                 let chunk_count_str = std::str::from_utf8(&chunk_count_bytes.0).unwrap();
                 let chunk_count: usize = chunk_count_str.parse().unwrap();
+                let mut keys = Vec::with_capacity(chunk_count);
                 for i in 0..chunk_count {
-                    let key = format!("{}.{}", self.config.key, i);
-                    self.client.get(key.as_bytes()).unwrap();
+                    keys.push(unsafe {
+                        std::mem::transmute::<&[u8], &'static [u8]>(
+                            format!("{}.{}", self.config.key, i).as_bytes(),
+                        )
+                    });
                 }
+                self.client.get_multi(&keys).unwrap();
             } else {
                 self.client.get(self.config.key.as_bytes()).unwrap();
             }
