@@ -68,11 +68,49 @@ impl Task for MemRS {
                 self.client
                     .set(
                         self.config.key.as_bytes(),
-                        chunks.len().to_string().as_bytes(),
+                        &(chunks.len() as u8).to_be_bytes(),
                         0,
                         0,
                     )
                     .unwrap();
+                let keys: Vec<_> = (0..chunks.len())
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
+                    .collect();
+                let kv: BTreeMap<&[u8], (&[u8], u32, u32)> = keys
+                    .iter()
+                    .map(|k| k.as_ref())
+                    .zip(chunks.clone().map(|v| (v, 0, 0)))
+                    .collect();
+                self.client.set_multi(kv).unwrap();
+
+                let v = self.client.get(self.config.key.as_bytes()).unwrap();
+                assert_eq!(u8::from_be_bytes([(*v.0)[0]]), chunks.len() as u8);
+                let v = self
+                    .client
+                    .get_multi(&keys.iter().map(|k| k.as_ref()).collect::<Vec<_>>())
+                    .unwrap();
+                assert_eq!(
+                    keys.iter().map(|k| v.get(k.as_ref())).fold(
+                        Vec::new(),
+                        |mut acc: Vec<u8>, v| {
+                            match v {
+                                Some(v) => {
+                                    acc.extend(v.0.iter());
+                                }
+                                None => (),
+                            }
+                            acc
+                        },
+                    ),
+                    chunks.fold(Vec::new(), |mut acc, v| {
+                        acc.extend(v.iter());
+                        acc
+                    })
+                );
             } else {
                 self.client
                     .set(
@@ -82,6 +120,9 @@ impl Task for MemRS {
                         0,
                     )
                     .unwrap();
+
+                let v = self.client.get(self.config.key.as_bytes()).unwrap();
+                assert_eq!(v.0, self.config.data_bytes);
             }
         }
     }
@@ -94,20 +135,23 @@ impl Task for MemRS {
                 self.client
                     .set(
                         self.config.key.as_bytes(),
-                        chunks.len().to_string().as_bytes(),
+                        &(chunks.len() as u8).to_be_bytes(),
                         0,
                         0,
                     )
                     .unwrap();
-                let mut kv: BTreeMap<&[u8], (&[u8], u32, u32)> = BTreeMap::new();
-                for (i, chunk) in chunks.enumerate() {
-                    let k = unsafe {
-                        std::mem::transmute::<&[u8], &'static [u8]>(
-                            format!("{}.{}", self.config.key, i).as_bytes(),
-                        )
-                    };
-                    kv.insert(k, (chunk, 0, 0));
-                }
+                let keys: Vec<_> = (0..chunks.len())
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
+                    .collect();
+                let kv: BTreeMap<&[u8], (&[u8], u32, u32)> = keys
+                    .iter()
+                    .map(|k| k.as_ref())
+                    .zip(chunks.map(|v| (v, 0, 0)))
+                    .collect();
                 self.client.set_multi(kv).unwrap();
             } else {
                 self.client
@@ -122,18 +166,32 @@ impl Task for MemRS {
             "SET"
         } else {
             if let Some(_) = self.config.chunk_size {
-                let chunk_count_bytes = self.client.get(self.config.key.as_bytes()).unwrap();
-                let chunk_count_str = std::str::from_utf8(&chunk_count_bytes.0).unwrap();
-                let chunk_count: usize = chunk_count_str.parse().unwrap();
-                let mut keys = Vec::with_capacity(chunk_count);
-                for i in 0..chunk_count {
-                    keys.push(unsafe {
-                        std::mem::transmute::<&[u8], &'static [u8]>(
-                            format!("{}.{}", self.config.key, i).as_bytes(),
-                        )
-                    });
-                }
-                self.client.get_multi(&keys).unwrap();
+                let v = self.client.get(self.config.key.as_bytes()).unwrap();
+                let chunk_count = u8::from_be_bytes([(*v.0)[0]]);
+                let keys: Vec<_> = (0..chunk_count)
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
+                    .collect();
+                let v = self
+                    .client
+                    .get_multi(&keys.iter().map(|k| k.as_ref()).collect::<Vec<_>>())
+                    .unwrap();
+                //merge results even if its not used to test perf properly
+                let _ = keys.iter().map(|k| v.get(k.as_ref())).fold(
+                    Vec::new(),
+                    |mut acc: Vec<u8>, v| {
+                        match v {
+                            Some(v) => {
+                                acc.extend(v.0.iter());
+                            }
+                            None => (),
+                        }
+                        acc
+                    },
+                );
             } else {
                 self.client.get(self.config.key.as_bytes()).unwrap();
             }
@@ -170,6 +228,9 @@ impl Task for RSMem {
             self.client
                 .set(&self.config.key, self.config.data_string.deref(), 0)
                 .unwrap();
+
+            let v: String = self.client.get(&self.config.key).unwrap().unwrap();
+            assert_eq!(v, self.config.data_string);
         }
     }
     fn run(&mut self) -> TaskResult {
@@ -220,6 +281,8 @@ impl Task for Basic {
                     0,
                 )
                 .unwrap();
+            let v: Vec<u8> = self.client.get(self.config.key.as_str()).unwrap().unwrap();
+            assert!(v == self.config.data_bytes)
         }
     }
     fn run(&mut self) -> TaskResult {
