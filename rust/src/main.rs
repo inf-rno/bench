@@ -7,6 +7,7 @@ use std::rc::Rc;
 use std::{thread, time};
 
 mod bench;
+mod client;
 mod hdr;
 mod task;
 
