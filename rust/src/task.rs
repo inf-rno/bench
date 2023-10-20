@@ -74,7 +74,11 @@ impl Task for MemRS {
                     )
                     .unwrap();
                 let keys: Vec<_> = (0..chunks.len())
-                    .map(|i| format!("{}.{}", self.config.key, i))
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
                     .collect();
                 let kv: BTreeMap<&[u8], (&[u8], u32, u32)> = keys
                     .iter()
@@ -90,14 +94,12 @@ impl Task for MemRS {
                     .get_multi(&keys.iter().map(|k| k.as_ref()).collect::<Vec<_>>())
                     .unwrap();
                 assert_eq!(
-                    keys.iter().map(|k| v.get(&k.clone().into_bytes())).fold(
+                    keys.iter().map(|k| v.get(k.as_ref())).fold(
                         Vec::new(),
-                        |mut acc, v| {
+                        |mut acc: Vec<u8>, v| {
                             match v {
                                 Some(v) => {
-                                    for b in &(v.0) {
-                                        acc.push(*b);
-                                    }
+                                    acc.extend(v.0.iter());
                                 }
                                 None => (),
                             }
@@ -105,9 +107,7 @@ impl Task for MemRS {
                         },
                     ),
                     chunks.fold(Vec::new(), |mut acc, v| {
-                        for b in v {
-                            acc.push(*b);
-                        }
+                        acc.extend(v.iter());
                         acc
                     })
                 );
@@ -141,7 +141,11 @@ impl Task for MemRS {
                     )
                     .unwrap();
                 let keys: Vec<_> = (0..chunks.len())
-                    .map(|i| format!("{}.{}", self.config.key, i))
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
                     .collect();
                 let kv: BTreeMap<&[u8], (&[u8], u32, u32)> = keys
                     .iter()
@@ -165,21 +169,23 @@ impl Task for MemRS {
                 let v = self.client.get(self.config.key.as_bytes()).unwrap();
                 let chunk_count = u8::from_be_bytes([(*v.0)[0]]);
                 let keys: Vec<_> = (0..chunk_count)
-                    .map(|i| format!("{}.{}", self.config.key, i))
+                    .map(|i| {
+                        format!("{}.{}", self.config.key, i)
+                            .into_boxed_str()
+                            .into_boxed_bytes()
+                    })
                     .collect();
                 let v = self
                     .client
                     .get_multi(&keys.iter().map(|k| k.as_ref()).collect::<Vec<_>>())
                     .unwrap();
                 //merge results even if its not used to test perf properly
-                let _ = keys.iter().map(|k| v.get(&k.clone().into_bytes())).fold(
+                let _ = keys.iter().map(|k| v.get(k.as_ref())).fold(
                     Vec::new(),
-                    |mut acc, v| {
+                    |mut acc: Vec<u8>, v| {
                         match v {
                             Some(v) => {
-                                for b in &(v.0) {
-                                    acc.push(*b);
-                                }
+                                acc.extend(v.0.iter());
                             }
                             None => (),
                         }
