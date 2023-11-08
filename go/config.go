@@ -8,7 +8,8 @@ type config struct {
 	concurrency int
 	ratio       float64
 	key         string
-	dataStr     string
+	keyRange    int
+	dataRange   []int
 	dataBytes   []byte
 	server      string
 	port        int

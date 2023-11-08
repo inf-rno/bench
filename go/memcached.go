@@ -27,22 +27,37 @@ func newMemcache(c *config) task {
 }
 
 func (m *memcache) init() {
-	if len(m.config.dataBytes) != 0 {
-		m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
+	if m.config.dataRange != nil {
+		if m.config.keyRange != 0 {
+			for i := 0; i < m.config.keyRange; i++ {
+				u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
+				m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: m.config.dataBytes[:u]})
+			}
+		} else {
+			m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
+		}
 	}
 }
 
 func (m *memcache) do() (op string, d time.Duration, err error) {
-	rand := rand.Float64()
-	if rand <= m.config.ratio && len(m.config.dataBytes) != 0 {
+	random := rand.Float64()
+	var k string
+	if m.config.keyRange != 0 {
+		k = fmt.Sprintf("%s-%d", m.config.key, rand.Intn(m.config.keyRange))
+	} else {
+		k = m.config.key
+	}
+
+	if random <= m.config.ratio && m.config.dataRange[0] != 0 {
 		op = "SET"
+		u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
 		start := hrtime.Now()
-		m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
+		m.client.Set(&gomemcache.Item{Key: k, Value: m.config.dataBytes[:u]})
 		d = hrtime.Now() - start
 	} else {
 		op = "GET"
 		start := hrtime.Now()
-		_, err = m.client.Get(m.config.key)
+		_, err = m.client.Get(k)
 		d = hrtime.Now() - start
 	}
 	return

@@ -26,23 +26,41 @@ func newRedis(c *config) task {
 }
 
 func (r *redis) init() {
-	if r.config.dataStr != "" {
-		_, err := r.conn.Do("SET", r.config.key, r.config.dataStr)
-		if err != nil {
-			panic(fmt.Errorf("failed to init set: %w", err))
+	if r.config.dataRange != nil {
+		if r.config.keyRange != 0 {
+			for i := 0; i < r.config.keyRange; i++ {
+				u := rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1) + r.config.dataRange[0]
+				_, err := r.conn.Do("SET", fmt.Sprintf("%s-%d", r.config.key, i), string(r.config.dataBytes[:u]))
+				if err != nil {
+					panic(fmt.Errorf("failed to init set: %w", err))
+				}
+			}
+		} else {
+			_, err := r.conn.Do("SET", r.config.key, string(r.config.dataBytes))
+			if err != nil {
+				panic(fmt.Errorf("failed to init set: %w", err))
+			}
 		}
 	}
 }
 
 func (r *redis) do() (op string, d time.Duration, err error) {
-	rand := rand.Float64()
+	random := rand.Float64()
 	args := []any{}
-	if rand <= r.config.ratio && r.config.dataStr != "" {
+	var k string
+	if r.config.keyRange != 0 {
+		k = fmt.Sprintf("%s-%d", r.config.key, rand.Intn(r.config.keyRange))
+	} else {
+		k = r.config.key
+	}
+
+	if random <= r.config.ratio && r.config.dataRange[0] != 0 {
 		op = "SET"
-		args = append(args, r.config.key, r.config.dataStr)
+		u := rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1) + r.config.dataRange[0]
+		args = append(args, k, string(r.config.dataBytes[:u]))
 	} else {
 		op = "GET"
-		args = append(args, r.config.key)
+		args = append(args, k)
 	}
 	start := hrtime.Now()
 	_, err = r.conn.Do(op, args...)
