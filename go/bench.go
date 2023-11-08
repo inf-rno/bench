@@ -56,8 +56,14 @@ func (b *bench) spawn() {
 
 func (b *bench) result() map[string]*result {
 	resMap := map[string]*result{}
+	var d int
+	if len(b.config.dataRange) == 1 {
+		d = b.config.dataRange[0]
+	} else {
+		d = 0
+	}
 	for op, times := range b.times {
-		resMap[op] = newResult(times, len(b.config.dataStr))
+		resMap[op] = newResult(times, d)
 	}
 	return resMap
 }

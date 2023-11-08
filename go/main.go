@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,7 +17,8 @@ func main() {
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
 	key := flag.String("k", "lol", "key/prefix to use")
-	data := flag.Int("d", 100000, "size of the data payload in bytes, specify 0 to not perform any writes")
+	keyRange := flag.Int("K", 100000, "key range")
+	data := flag.String("d", "100000", "size of the data payload in bytes, specify 0 to not perform any writes. optionally a range (e.g. 100-1000)")
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
 	socket := flag.String("S", "", "unix domain socket name")
@@ -26,22 +27,41 @@ func main() {
 
 	flag.Parse()
 
-	rand.Seed(time.Now().UnixNano())
-
 	c := &config{
 		runs:        *runs,
 		iters:       *iters,
 		concurrency: *concurrency,
 		ratio:       *ratio,
 		key:         *key,
+		keyRange:    *keyRange,
 		server:      *server,
 		port:        *port,
 		socket:      *socket,
 		protocol:    *protocol,
 		out:         *out,
 	}
-	c.dataStr = strings.Repeat("x", *data)
-	c.dataBytes = []byte(c.dataStr)
+
+	if strings.Contains(*data, "-") {
+		split := strings.Split(*data, "-")
+		if len(split) != 2 {
+			panic(fmt.Errorf("invalid data range: %s", *data))
+		}
+		lower, err := strconv.Atoi(split[0])
+		if err != nil {
+			panic(fmt.Errorf("invalid lower data range: %s", *data))
+		}
+		upper, err := strconv.Atoi(split[1])
+		if err != nil {
+			panic(fmt.Errorf("invalid upper data range: %s", *data))
+		}
+		c.dataRange = []int{lower, upper}
+	} else {
+		d, err := strconv.Atoi(*data)
+		if err != nil {
+			panic(fmt.Errorf("invalid data size: %s", *data))
+		}
+		c.dataRange = []int{d}
+	}
 	run(c)
 }
 
