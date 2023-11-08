@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	redigo "github.com/gomodule/redigo/redis"
@@ -27,25 +26,17 @@ func newRedis(c *config) task {
 }
 
 func (r *redis) init() {
-	if r.config.dataRange[0] != 0 {
+	if r.config.dataRange != nil {
 		if r.config.keyRange != 0 {
 			for i := 0; i < r.config.keyRange; i++ {
-				if len(r.config.dataRange) == 1 && r.config.dataRange[0] != 0 {
-					v := strings.Repeat("x", r.config.dataRange[0])
-					_, err := r.conn.Do("SET", fmt.Sprintf("%s-%d", r.config.key, i), v)
-					if err != nil {
-						panic(fmt.Errorf("failed to init set: %w", err))
-					}
-				} else if len(r.config.dataRange) == 2 {
-					v := strings.Repeat("x", rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1)+r.config.dataRange[1])
-					_, err := r.conn.Do("SET", fmt.Sprintf("%s-%d", r.config.key, i), v)
-					if err != nil {
-						panic(fmt.Errorf("failed to init set: %w", err))
-					}
+				u := rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1) + r.config.dataRange[0]
+				_, err := r.conn.Do("SET", fmt.Sprintf("%s-%d", r.config.key, i), string(r.config.dataBytes[:u]))
+				if err != nil {
+					panic(fmt.Errorf("failed to init set: %w", err))
 				}
 			}
 		} else {
-			_, err := r.conn.Do("SET", r.config.key, strings.Repeat("x", r.config.dataRange[0]))
+			_, err := r.conn.Do("SET", r.config.key, string(r.config.dataBytes))
 			if err != nil {
 				panic(fmt.Errorf("failed to init set: %w", err))
 			}
@@ -65,13 +56,8 @@ func (r *redis) do() (op string, d time.Duration, err error) {
 
 	if random <= r.config.ratio && r.config.dataRange[0] != 0 {
 		op = "SET"
-		var val string
-		if len(r.config.dataRange) == 1 {
-			val = strings.Repeat("x", r.config.dataRange[0])
-		} else {
-			val = strings.Repeat("x", rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1)+r.config.dataRange[1])
-		}
-		args = append(args, k, val)
+		u := rand.Intn(r.config.dataRange[1]-r.config.dataRange[0]+1) + r.config.dataRange[0]
+		args = append(args, k, string(r.config.dataBytes[:u]))
 	} else {
 		op = "GET"
 		args = append(args, k)

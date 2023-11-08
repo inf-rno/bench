@@ -10,6 +10,7 @@ type config struct {
 	key         string
 	keyRange    int
 	dataRange   []int
+	dataBytes   []byte
 	server      string
 	port        int
 	socket      string

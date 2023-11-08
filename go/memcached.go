@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	gomemcache "github.com/bradfitz/gomemcache/memcache"
@@ -28,18 +27,14 @@ func newMemcache(c *config) task {
 }
 
 func (m *memcache) init() {
-	if m.config.dataRange[0] != 0 {
+	if m.config.dataRange != nil {
 		if m.config.keyRange != 0 {
 			for i := 0; i < m.config.keyRange; i++ {
-				if len(m.config.dataRange) == 1 && m.config.dataRange[0] != 0 {
-					v := []byte(strings.Repeat("x", m.config.dataRange[0]))
-					m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: v})
-				} else if len(m.config.dataRange) == 2 {
-					m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: []byte(strings.Repeat("x", rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1)+m.config.dataRange[1]))})
-				}
+				u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
+				m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: m.config.dataBytes[:u]})
 			}
 		} else {
-			m.client.Set(&gomemcache.Item{Key: m.config.key, Value: []byte(strings.Repeat("x", m.config.dataRange[0]))})
+			m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
 		}
 	}
 }
@@ -55,14 +50,9 @@ func (m *memcache) do() (op string, d time.Duration, err error) {
 
 	if random <= m.config.ratio && m.config.dataRange[0] != 0 {
 		op = "SET"
-		var val []byte
-		if len(m.config.dataRange) == 1 {
-			val = []byte(strings.Repeat("x", m.config.dataRange[0]))
-		} else {
-			val = []byte(strings.Repeat("x", rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1)+m.config.dataRange[1]))
-		}
+		u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
 		start := hrtime.Now()
-		m.client.Set(&gomemcache.Item{Key: k, Value: val})
+		m.client.Set(&gomemcache.Item{Key: k, Value: m.config.dataBytes[:u]})
 		d = hrtime.Now() - start
 	} else {
 		op = "GET"

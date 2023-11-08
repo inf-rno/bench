@@ -17,7 +17,7 @@ func main() {
 	concurrency := flag.Int("c", 1, "number of concurrent goroutines")
 	ratio := flag.Float64("r", 0.1, "ratio of ops (eg. sets vs gets)")
 	key := flag.String("k", "lol", "key/prefix to use")
-	keyRange := flag.Int("K", 100000, "key range")
+	keyRange := flag.Int("K", 0, "key range")
 	data := flag.String("d", "100000", "size of the data payload in bytes, specify 0 to not perform any writes. optionally a range (e.g. 100-1000)")
 	server := flag.String("s", "127.0.0.1", "server address")
 	port := flag.Int("p", 6379, "server port")
@@ -60,7 +60,13 @@ func main() {
 		if err != nil {
 			panic(fmt.Errorf("invalid data size: %s", *data))
 		}
-		c.dataRange = []int{d}
+		if d != 0 {
+			c.dataRange = []int{d, d}
+		}
+	}
+
+	if c.dataRange != nil {
+		c.dataBytes = []byte(strings.Repeat("x", c.dataRange[1]))
 	}
 	run(c)
 }
