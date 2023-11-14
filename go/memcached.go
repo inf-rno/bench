@@ -31,10 +31,16 @@ func (m *memcache) init() {
 		if m.config.keyRange != 0 {
 			for i := 0; i < m.config.keyRange; i++ {
 				u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
-				m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: m.config.dataBytes[:u]})
+				err := m.client.Set(&gomemcache.Item{Key: fmt.Sprintf("%s-%d", m.config.key, i), Value: m.config.dataBytes[:u]})
+				if err != nil {
+					panic(fmt.Errorf("failed to init memcache: %w", err))
+				}
 			}
 		} else {
-			m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
+			err := m.client.Set(&gomemcache.Item{Key: m.config.key, Value: m.config.dataBytes})
+			if err != nil {
+				panic(fmt.Errorf("failed to init memcache: %w", err))
+			}
 		}
 	}
 }
@@ -52,7 +58,7 @@ func (m *memcache) do() (op string, d time.Duration, err error) {
 		op = "SET"
 		u := rand.Intn(m.config.dataRange[1]-m.config.dataRange[0]+1) + m.config.dataRange[0]
 		start := hrtime.Now()
-		m.client.Set(&gomemcache.Item{Key: k, Value: m.config.dataBytes[:u]})
+		err = m.client.Set(&gomemcache.Item{Key: k, Value: m.config.dataBytes[:u]})
 		d = hrtime.Now() - start
 	} else {
 		op = "GET"
