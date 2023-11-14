@@ -217,7 +217,10 @@ impl RSMem {
         if !c.socket.is_empty() {
             addr = format!("memcache://{}", c.socket)
         }
-        addr = format!("{}?protocol=binary&connect_timeout=1", addr);
+        addr = format!(
+            "{}?protocol=binary&connect_timeout=1&tcp_nodelay=true",
+            addr
+        );
         let client = memcache::connect(addr).unwrap();
         client
             .set_read_timeout(Some(Duration::from_secs(1)))
