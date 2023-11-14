@@ -47,6 +47,9 @@ pub struct Config {
     /// Server Port
     #[arg(short = 'p', long, default_value_t = 11211)]
     port: i64,
+    /// UDP Server Port
+    #[arg(short = 'u', long, default_value_t = 0)]
+    udp_port: i64,
     /// UNIX domain socket name
     #[arg(short = 'S', long, default_value = "")]
     socket: String,

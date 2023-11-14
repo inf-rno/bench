@@ -210,13 +210,24 @@ struct RSMem {
 impl RSMem {
     fn new(c: Rc<Config>) -> Self {
         dbg!("RSMEM");
-        let mut addr = format!("memcache://{}:{}?protocol=binary", c.server, c.port);
-        if !c.socket.is_empty() {
-            addr = format!("memcache://{}?protocol=binary", c.socket)
+        let mut addr = format!("memcache+tcp://{}:{}", c.server, c.port);
+        if c.udp_port != 0 {
+            addr = format!("memcache+udp://{}:{}", c.server, c.udp_port)
         }
+        if !c.socket.is_empty() {
+            addr = format!("memcache://{}", c.socket)
+        }
+        addr = format!("{}?protocol=binary&connect_timeout=1", addr);
+        let client = memcache::connect(addr).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
+        client
+            .set_write_timeout(Some(Duration::from_secs(1)))
+            .unwrap();
         RSMem {
             config: c,
-            client: memcache::connect(addr).unwrap(),
+            client: client,
             rng: SmallRng::from_entropy(),
         }
     }
