@@ -67,7 +67,8 @@ func main() {
 
 	if c.dataRange != nil {
 		c.dataBytes = []byte(strings.Repeat("x", c.dataRange[1]))
-		run(c)
+	}
+	run(c)
 }
 
 func run(c *config) {
