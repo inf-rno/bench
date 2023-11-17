@@ -39,8 +39,8 @@ pub struct Config {
     #[arg(short = 't', long, value_enum, default_value_t = ClientType::MEMRS)]
     client_type: ClientType,
     /// output prefix for hdrHistogram files
-    #[arg(short = 'o', long, default_value = "")]
-    out: String,
+    #[arg(short = 'o', long)]
+    out: Option<String>,
     /// Server address
     #[arg(short = 's', long, default_value = "127.0.0.1")]
     server: String,
@@ -48,11 +48,11 @@ pub struct Config {
     #[arg(short = 'p', long, default_value_t = 11211)]
     port: i64,
     /// UDP Server Port
-    #[arg(short = 'u', long, default_value_t = 0)]
-    udp_port: i64,
+    #[arg(short = 'u', long)]
+    udp_port: Option<i64>,
     /// UNIX domain socket name
-    #[arg(short = 'S', long, default_value = "")]
-    socket: String,
+    #[arg(short = 'S', long)]
+    socket: Option<String>,
 }
 
 fn main() -> std::io::Result<()> {
@@ -104,8 +104,8 @@ fn main() -> std::io::Result<()> {
     println!("\nBEST RESULT:");
     for (op, r) in max_map {
         println!("OP: {op} \n {r}");
-        if !c.out.is_empty() {
-            let file = File::create(c.out.clone() + "_rs_" + &op)?;
+        if let Some(out) = &c.out {
+            let file = File::create(out.clone() + "_rs_" + &op)?;
             r.histogram.percentiles(file)?;
             // r.histogram.serialize(file);
         }

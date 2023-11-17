@@ -49,8 +49,8 @@ impl MemRS {
     fn new(c: Rc<Config>) -> Self {
         dbg!("MEMRS");
         let mut addr = format!("tcp://{}:{}", c.server, c.port);
-        if !c.socket.is_empty() {
-            addr = format!("unix://{}", c.socket)
+        if let Some(sock) = &c.socket {
+            addr = format!("unix://{}", sock)
         }
         MemRS {
             config: c,
@@ -211,11 +211,11 @@ impl RSMem {
     fn new(c: Rc<Config>) -> Self {
         dbg!("RSMEM");
         let mut addr = format!("memcache+tcp://{}:{}", c.server, c.port);
-        if c.udp_port != 0 {
-            addr = format!("memcache+udp://{}:{}", c.server, c.udp_port)
+        if let Some(port) = c.udp_port {
+            addr = format!("memcache+udp://{}:{}", c.server, port)
         }
-        if !c.socket.is_empty() {
-            addr = format!("memcache://{}", c.socket)
+        if let Some(sock) = &c.socket {
+            addr = format!("memcache://{}", sock)
         }
         addr = format!(
             "{}?protocol=binary&connect_timeout=1&tcp_nodelay=true",
@@ -273,8 +273,8 @@ impl Basic {
     fn new(c: Rc<Config>) -> Self {
         dbg!("Basic");
         let mut addr = format!("{}:{}", c.server, c.port);
-        if !c.socket.is_empty() {
-            addr = c.socket.clone()
+        if let Some(sock) = &c.socket {
+            addr = sock.clone()
         }
         Basic {
             config: c,

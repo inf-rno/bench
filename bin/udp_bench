@@ -32,7 +32,7 @@ do
     (
         set -x
         cargo run --release -- -x 1 -t rsmem -n 1 -d $size -r 1 -k lol -s $addr
-        cargo run --release -- -x 1 -t rsmem -n 10000 -d 0 -r 0 -k lol -o ${outPre}/${sizeStr}_TCP_ -s $addr
-        cargo run --release -- -x 1 -t rsmem -n 10000 -d 0 -r 0 -k lol -o ${outPre}/${sizeStr}_UDP_ -s $addr -u 11311
+        cargo run --release -- -t rsmem -n 10000 -d 0 -r 0 -k lol -o ${outPre}/${sizeStr}_TCP -s $addr
+        cargo run --release -- -t rsmem -n 10000 -d 0 -r 0 -k lol -o ${outPre}/${sizeStr}_UDP -s $addr -u 11311
     ) >> $log 2>&1
 done
